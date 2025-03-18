@@ -24,6 +24,7 @@ func ExecuteCommand(cmdStr string) (string, error) {
 	cmd.Stdout = &out
 	cmd.Stderr = &stderr
 
+	// TODO: Implement timeout
 	err := cmd.Run()
 	if err != nil {
 		return stderr.String(), fmt.Errorf("command execution failed: %w", err)
