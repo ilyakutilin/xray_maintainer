@@ -6,7 +6,17 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
+
+// Returns the modification time of a file
+func FileModTime(path string) (time.Time, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return info.ModTime(), nil
+}
 
 // Downloads a file from a given URL and saves it to a specified path
 func DownloadFile(url, path, filename string, executable bool) error {
