@@ -10,6 +10,15 @@ import (
 	"time"
 )
 
+// Checks if a file exists
+func CheckFileExists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return true, err
+}
+
 // Returns the modification time of a file
 func FileModTime(path string) (time.Time, error) {
 	info, err := os.Stat(path)
