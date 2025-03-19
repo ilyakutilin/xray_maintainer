@@ -21,7 +21,7 @@ func main() {
 		fmt.Println("Could not load .env file - relying on flags and defaults...")
 	}
 
-	cfg, err := LoadConfig()
+	cfg, err := loadConfig()
 	if err != nil {
 		log.Fatalf("Error loading config: %v", err)
 	}

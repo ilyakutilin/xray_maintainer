@@ -13,7 +13,7 @@ import (
 )
 
 // Checks if a file exists
-func CheckFileExists(path string) (bool, error) {
+func checkFileExists(path string) (bool, error) {
 	_, err := os.Stat(path)
 	if os.IsNotExist(err) {
 		return false, nil
@@ -22,7 +22,7 @@ func CheckFileExists(path string) (bool, error) {
 }
 
 // Returns the modification time of a file
-func FileModTime(path string) (time.Time, error) {
+func fileModTime(path string) (time.Time, error) {
 	info, err := os.Stat(path)
 	if err != nil {
 		return time.Time{}, err
@@ -31,7 +31,7 @@ func FileModTime(path string) (time.Time, error) {
 }
 
 // Handles ~, relative paths, and normalizes them
-func ExpandPath(path string) (string, error) {
+func expandPath(path string) (string, error) {
 	// Expand tilde (~) to the user's home directory
 	if strings.HasPrefix(path, "~") {
 		usr, err := user.Current()
@@ -50,7 +50,7 @@ func ExpandPath(path string) (string, error) {
 }
 
 // Returns the published time of a GitHub release
-func GetPublishedTime(apiURL string) (time.Time, error) {
+func getPublishedTime(apiURL string) (time.Time, error) {
 	resp, err := http.Get(apiURL)
 	if err != nil {
 		return time.Time{}, err
@@ -78,7 +78,7 @@ func GetPublishedTime(apiURL string) (time.Time, error) {
 }
 
 // Downloads a file from a given URL and saves it to a specified path
-func DownloadFile(url, path, filename string, executable bool) (string, error) {
+func downloadFile(url, path, filename string, executable bool) (string, error) {
 	if filename == "" {
 		parts := strings.Split(url, "/")
 		filename = parts[len(parts)-1]

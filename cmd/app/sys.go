@@ -9,7 +9,7 @@ import (
 )
 
 // Checks if the app has sudo privileges
-func CheckSudo() error {
+func checkSudo() error {
 	if os.Geteuid() != 0 {
 		return errors.New("this application requires sudo/root privileges")
 	}
@@ -17,7 +17,7 @@ func CheckSudo() error {
 }
 
 // Runs a shell command and returns its output or an error.
-func ExecuteCommand(cmdStr string) (string, error) {
+func executeCommand(cmdStr string) (string, error) {
 	cmd := exec.Command("bash", "-c", cmdStr)
 	var out bytes.Buffer
 	var stderr bytes.Buffer
@@ -34,12 +34,12 @@ func ExecuteCommand(cmdStr string) (string, error) {
 }
 
 func restartService(serviceName string) error {
-	_, err := ExecuteCommand(fmt.Sprintf("sudo systemctl restart %s", serviceName))
+	_, err := executeCommand(fmt.Sprintf("sudo systemctl restart %s", serviceName))
 	return err
 }
 
 func checkServiceStatus(serviceName string) (bool, error) {
-	output, err := ExecuteCommand(fmt.Sprintf("systemctl is-active %s", serviceName))
+	output, err := executeCommand(fmt.Sprintf("systemctl is-active %s", serviceName))
 	if err != nil {
 		return false, err
 	}

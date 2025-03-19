@@ -18,7 +18,7 @@ type CFCreds struct {
 
 // Parses the Cloudflare generator output. Tailored specifically for the output of
 // github.com/badafans/warp-reg.
-func ParseCFCreds(output string) (CFCreds, error) {
+func parseCFCreds(output string) (CFCreds, error) {
 	var result CFCreds
 
 	patterns := map[string]*regexp.Regexp{

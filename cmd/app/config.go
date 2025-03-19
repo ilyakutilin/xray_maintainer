@@ -84,7 +84,7 @@ func getPriorityInt(flagValue int, envKey string, defaultValue int) (int, error)
 // }
 
 // Loads configuration from flags, environment variables, or defaults
-func LoadConfig() (*Config, error) {
+func loadConfig() (*Config, error) {
 	// Define CLI flags (there are no defaults for CLI flags since defaults are handled
 	// by environment variables)
 	xrayDirPathFlag := flag.String("xray-dir-path", "", "Path of the xray server directory with the executable, config and geofiles")
@@ -123,7 +123,7 @@ func LoadConfig() (*Config, error) {
 		return nil, err
 	}
 
-	cfg.xrayDirPath, err = ExpandPath(xrayDirPath)
+	cfg.xrayDirPath, err = expandPath(xrayDirPath)
 
 	if err != nil {
 		return nil, err
