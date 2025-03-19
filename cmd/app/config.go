@@ -116,7 +116,7 @@ func LoadConfig() (*Config, error) {
 	cfg.geoipDownloadURL = execFn(getPriorityString, *geoipDownloadURLFlag, "GEOIP_DOWNLOAD_URL", "https://github.com/v2fly/geoip/releases/latest/download/geoip.dat", &err)
 	cfg.geositeReleaseInfoURL = execFn(getPriorityString, *geositeReleaseInfoURLFlag, "GEOSITE_RELEASE_INFO_URL", "https://api.github.com/repos/v2fly/domain-list-community/releases/latest", &err)
 	cfg.geositeDownloadURL = execFn(getPriorityString, *geositeDownloadURLFlag, "GEOSITE_DOWNLOAD_URL", "https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat", &err)
-	cfg.xrayCoreReleaseInfoURL = execFn(getPriorityString, *xrayCoreReleaseInfoURLFlag, "XRAY_CORE_RELEASE_INFO_URL", "https://api.github.com/repos/XTLS/Xray-core/releases/latest")
+	cfg.xrayCoreReleaseInfoURL = execFn(getPriorityString, *xrayCoreReleaseInfoURLFlag, "XRAY_CORE_RELEASE_INFO_URL", "https://api.github.com/repos/XTLS/Xray-core/releases/latest", &err)
 	cfg.xrayCoreDownloadURL = execFn(getPriorityString, *xrayCoreDownloadURLFlag, "XRAY_CORE_DOWNLOAD_URL", "https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip", &err)
 
 	if err != nil {
