@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -26,6 +27,34 @@ func FileModTime(path string) (time.Time, error) {
 		return time.Time{}, err
 	}
 	return info.ModTime(), nil
+}
+
+// Returns the published time of a GitHub release
+func GetPublishedTime(apiURL string) (time.Time, error) {
+	resp, err := http.Get(apiURL)
+	if err != nil {
+		return time.Time{}, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return time.Time{}, fmt.Errorf("GitHub API request failed with status: %d", resp.StatusCode)
+	}
+
+	var release struct {
+		PublishedAt string `json:"published_at"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return time.Time{}, err
+	}
+
+	parsedTime, err := time.Parse(time.RFC3339, release.PublishedAt)
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	return parsedTime, nil
 }
 
 // Downloads a file from a given URL and saves it to a specified path
