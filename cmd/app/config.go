@@ -9,17 +9,18 @@ import (
 
 // Holds the application configuration
 type Config struct {
-	xrayDirPath           string
-	xrayServerIP          string
-	xrayProtocol          string
-	xrayClientPort        int
-	ipCheckerURL          string
-	cfCredGenURL          string
-	geoipReleaseInfoURL   string
-	geoipDownloadURL      string
-	geositeReleaseInfoURL string
-	geositeDownloadURL    string
-	xrayCoreDownloadURL   string
+	xrayDirPath            string
+	xrayServerIP           string
+	xrayProtocol           string
+	xrayClientPort         int
+	ipCheckerURL           string
+	cfCredGenURL           string
+	geoipReleaseInfoURL    string
+	geoipDownloadURL       string
+	geositeReleaseInfoURL  string
+	geositeDownloadURL     string
+	xrayCoreReleaseInfoURL string
+	xrayCoreDownloadURL    string
 }
 
 type AllowedTypes interface {
@@ -86,17 +87,18 @@ func getPriorityInt(flagValue int, envKey string, defaultValue int) (int, error)
 func LoadConfig() (*Config, error) {
 	// Define CLI flags (there are no defaults for CLI flags since defaults are handled
 	// by environment variables)
-	xrayDirPathFlag := flag.String("xray_server_path", "", "Path of the xray server directory with the executable, config and geofiles")
-	xrayServerIPFlag := flag.String("xray_server_ip", "", "XRay server IP")
-	xrayProtocolFlag := flag.String("xray_protocol", "", "XRay protocol")
-	xrayClientPortFlag := flag.Int("xray_client_port", 0, "Port used by the test throwaway xray client")
-	ipCheckerURLFlag := flag.String("ip_checker_url", "", "IP checker service URL")
-	cfCredGenURLFlag := flag.String("cf_gen_url", "", "URL for downloading the Cloudflare credential generator")
-	geoipReleaseInfoURLFlag := flag.String("geoip_rel_url", "", "URL for fetching geoip release info")
-	geoipDownloadURLFlag := flag.String("geoip_dl_url", "", "URL for downloading a geoip.dat file")
-	geositeReleaseInfoURLFlag := flag.String("geosite_rel_url", "", "URL for fetching geosite release info")
-	geositeDownloadURLFlag := flag.String("geosite_url", "", "URL for downloading a geosite.dat file")
-	xrayCoreDownloadURLFlag := flag.String("xray_core_dl_url", "", "XRay server executable URL")
+	xrayDirPathFlag := flag.String("xray-dir-path", "", "Path of the xray server directory with the executable, config and geofiles")
+	xrayServerIPFlag := flag.String("xray-server-ip", "", "XRay server IP")
+	xrayProtocolFlag := flag.String("xray-protocol", "", "XRay protocol")
+	xrayClientPortFlag := flag.Int("xray-client-port", 0, "Port used by the test throwaway xray client")
+	ipCheckerURLFlag := flag.String("ip-checker-url", "", "IP checker service URL")
+	cfCredGenURLFlag := flag.String("cf-gen-url", "", "URL for downloading the Cloudflare credential generator")
+	geoipReleaseInfoURLFlag := flag.String("geoip-rel-url", "", "URL for fetching geoip release info")
+	geoipDownloadURLFlag := flag.String("geoip-dl-url", "", "URL for downloading a geoip.dat file")
+	geositeReleaseInfoURLFlag := flag.String("geosite-rel-url", "", "URL for fetching geosite release info")
+	geositeDownloadURLFlag := flag.String("geosite-url", "", "URL for downloading a geosite.dat file")
+	xrayCoreReleaseInfoURLFlag := flag.String("xray-core-rel-url", "", "URL for fetching the XRay server executable release info")
+	xrayCoreDownloadURLFlag := flag.String("xray-core-dl-url", "", "XRay server executable URL")
 
 	flag.Parse()
 
@@ -114,6 +116,7 @@ func LoadConfig() (*Config, error) {
 	cfg.geoipDownloadURL = execFn(getPriorityString, *geoipDownloadURLFlag, "GEOIP_DOWNLOAD_URL", "https://github.com/v2fly/geoip/releases/latest/download/geoip.dat", &err)
 	cfg.geositeReleaseInfoURL = execFn(getPriorityString, *geositeReleaseInfoURLFlag, "GEOSITE_RELEASE_INFO_URL", "https://api.github.com/repos/v2fly/domain-list-community/releases/latest", &err)
 	cfg.geositeDownloadURL = execFn(getPriorityString, *geositeDownloadURLFlag, "GEOSITE_DOWNLOAD_URL", "https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat", &err)
+	cfg.xrayCoreReleaseInfoURL = execFn(getPriorityString, *xrayCoreReleaseInfoURLFlag, "XRAY_CORE_RELEASE_INFO_URL", "https://api.github.com/repos/XTLS/Xray-core/releases/latest")
 	cfg.xrayCoreDownloadURL = execFn(getPriorityString, *xrayCoreDownloadURLFlag, "XRAY_CORE_DOWNLOAD_URL", "https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip", &err)
 
 	if err != nil {
