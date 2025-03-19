@@ -32,3 +32,16 @@ func ExecuteCommand(cmdStr string) (string, error) {
 
 	return out.String(), nil
 }
+
+func restartService(serviceName string) error {
+	_, err := ExecuteCommand(fmt.Sprintf("sudo systemctl restart %s", serviceName))
+	return err
+}
+
+func checkServiceStatus(serviceName string) (bool, error) {
+	output, err := ExecuteCommand(fmt.Sprintf("systemctl is-active %s", serviceName))
+	if err != nil {
+		return false, err
+	}
+	return output == "active", nil
+}

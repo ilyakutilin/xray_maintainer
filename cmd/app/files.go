@@ -124,3 +124,12 @@ func DownloadFile(url, path, filename string, executable bool) (string, error) {
 
 	return filePath, nil
 }
+
+// Checks if the version of the file by the specified fullPath (including the filename)
+// can be updated to a newer version based on the latest release version from Github.
+// Updates the file if necessary.
+func updateFile(file File) (File, error) {
+	// TODO: Implement the updateFile function
+
+	return File{}, nil
+}
