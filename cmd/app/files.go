@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/user"
 	"path/filepath"
 	"strings"
 	"time"
@@ -27,6 +28,25 @@ func FileModTime(path string) (time.Time, error) {
 		return time.Time{}, err
 	}
 	return info.ModTime(), nil
+}
+
+// Handles ~, relative paths, and normalizes them
+func ExpandPath(path string) (string, error) {
+	// Expand tilde (~) to the user's home directory
+	if strings.HasPrefix(path, "~") {
+		usr, err := user.Current()
+		if err != nil {
+			return "", err
+		}
+		path = filepath.Join(usr.HomeDir, path[1:])
+	}
+
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return "", err
+	}
+
+	return filepath.Clean(absPath), nil
 }
 
 // Returns the published time of a GitHub release

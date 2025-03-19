@@ -19,5 +19,6 @@ func main() {
 	}
 
 	// TODO: Remove print stmt
+	fmt.Println(cfg.xrayDirPath)
 	fmt.Println(cfg.xrayServerIP)
 }
