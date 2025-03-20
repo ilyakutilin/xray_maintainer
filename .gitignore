@@ -65,3 +65,5 @@ go.work
 
 ### Project Specific ###
 xray/
+files/
+exp/
