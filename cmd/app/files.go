@@ -153,29 +153,41 @@ func downloadFile(url, dirPath, filename string) (string, error) {
 // can be updated to a newer version based on the latest release version from Github.
 // Updates the file if necessary.
 func updateFile(file File) error {
+	logger := GetLogger()
+
 	fileName := filepath.Base(file.filePath)
-	versionFilePath := filepath.Join(filepath.Dir(file.filePath), "versions.json")
+	fileDir := filepath.Dir(file.filePath)
+	versionFilePath := filepath.Join(fileDir, "versions.json")
+
+	logger.Info.Printf("Starting to update the %s file...\n", fileName)
 
 	latestReleaseTag, err := getLatestReleaseTag(file.releaseURL)
 	if err != nil {
 		return err
 	}
+	logger.Info.Printf("The latest release tag for %s: %s\n", fileName, latestReleaseTag)
 
+	logger.Info.Printf("Looking for %s file in %s...\n", fileName, fileDir)
 	if fileExists(file.filePath) {
+		logger.Info.Printf("%s file found in %s\n", fileName, fileDir)
 		storedTag, err := getStoredReleaseTag(fileName, versionFilePath)
 		if err != nil {
 			return err
 		}
 
 		if storedTag == latestReleaseTag {
+			logger.Info.Printf("%s file is already up-to-date, no further action required\n", fileName)
 			return nil
 		}
+	} else {
+		logger.Info.Printf("%s file not found in %s, starting to download...\n", fileName, fileDir)
 	}
 
-	_, err = downloadFile(file.downloadURL, filepath.Dir(file.filePath), "")
+	downloadedFile, err := downloadFile(file.downloadURL, fileDir, "")
 	if err != nil {
 		return err
 	}
+	logger.Info.Printf("File downloaded: %s\n", downloadedFile)
 
 	return nil
 }
