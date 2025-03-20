@@ -108,7 +108,8 @@ func getLatestReleaseTag(apiURL string) (string, error) {
 
 // Downloads a file from a given URL and saves it to a specified directory path.
 // If a filename is provided, it will be used, otherwise the filename will be extracted
-// from the URL. The permissions are set based on umask.
+// from the URL. The permissions are set based on umask. Returns the full path
+// to the downloaded file.
 func downloadFile(url, dirPath, filename string) (string, error) {
 	if filename == "" {
 		parts := strings.Split(url, "/")
@@ -149,6 +150,14 @@ func downloadFile(url, dirPath, filename string) (string, error) {
 	return filePath, nil
 }
 
+// TODO: Implement the function
+// unZip unzips a zip file into a temporary directory and returns a map of file paths,
+// where the keys are file names with extensions and the values are full paths to the
+// files in the unzipped temporary directory.
+func unZip(zipFilePath string) (map[string]string, error) {
+	return make(map[string]string), nil
+}
+
 // Checks if the version of the file by the specified fullPath (including the filename)
 // can be updated to a newer version based on the latest release version from Github.
 // Updates the file if necessary.
@@ -183,11 +192,34 @@ func updateFile(file File) error {
 		logger.Info.Printf("%s file not found in %s, starting to download...\n", fileName, fileDir)
 	}
 
-	downloadedFile, err := downloadFile(file.downloadURL, fileDir, "")
+	downloadedFilePath, err := downloadFile(file.downloadURL, fileDir, "")
 	if err != nil {
 		return err
 	}
-	logger.Info.Printf("File downloaded: %s\n", downloadedFile)
+	logger.Info.Printf("File downloaded: %s\n", downloadedFilePath)
+
+	if filepath.Ext(downloadedFilePath) == ".zip" {
+		logger.Info.Printf("Unzipping %s...\n", downloadedFilePath)
+		unzippedFiles, err := unZip(downloadedFilePath)
+		if err != nil {
+			return err
+		}
+
+		var unzippedFile string
+		for fn, fp := range unzippedFiles {
+			if fn == fileName {
+				unzippedFile = fp
+				break
+			}
+		}
+
+		if unzippedFile == "" {
+			return fmt.Errorf("file %s not found in unzipped files", fileName)
+		}
+
+		logger.Info.Printf("Unzipped file: %s\n", unzippedFile)
+
+	}
 
 	return nil
 }
