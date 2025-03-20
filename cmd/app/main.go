@@ -13,7 +13,6 @@ type File struct {
 	filePath    string
 	releaseURL  string
 	downloadURL string
-	executable  bool
 }
 
 type Logger struct {
@@ -44,7 +43,6 @@ func main() {
 		filePath:    filepath.Join(cfg.xrayDirPath, "xray"),
 		releaseURL:  cfg.xrayCoreReleaseInfoURL,
 		downloadURL: cfg.xrayCoreDownloadURL,
-		executable:  true,
 	}
 	// TODO: Add error handling
 	_ = updateFile(xrayExecutable)
@@ -53,7 +51,6 @@ func main() {
 		filePath:    filepath.Join(cfg.xrayDirPath, "geoip.dat"),
 		releaseURL:  cfg.geoipReleaseInfoURL,
 		downloadURL: cfg.geoipDownloadURL,
-		executable:  false,
 	}
 	// TODO: Add error handling
 	_ = updateFile(geoipFile)
@@ -62,7 +59,6 @@ func main() {
 		filePath:    filepath.Join(cfg.xrayDirPath, "geosite.dat"),
 		releaseURL:  cfg.geositeReleaseInfoURL,
 		downloadURL: cfg.geositeDownloadURL,
-		executable:  false,
 	}
 	// TODO: Add error handling
 	_ = updateFile(geositeFile)

@@ -106,21 +106,20 @@ func getLatestReleaseTag(apiURL string) (string, error) {
 	return release.TagName, nil
 }
 
-// Downloads a file from a given URL and saves it to a specified path.
+// Downloads a file from a given URL and saves it to a specified directory path.
 // If a filename is provided, it will be used, otherwise the filename will be extracted
-// from the URL. If the executable flag is true, the file will be made executable
-// with permissions -rwxr-xr-x. Otherwise the permissions will be set based on umask.
-func downloadFile(url, path, filename string, executable bool) (string, error) {
+// from the URL. The permissions are set based on umask.
+func downloadFile(url, dirPath, filename string) (string, error) {
 	if filename == "" {
 		parts := strings.Split(url, "/")
 		filename = parts[len(parts)-1]
 	}
 
-	if err := os.MkdirAll(path, os.ModePerm); err != nil {
+	if err := os.MkdirAll(dirPath, os.ModePerm); err != nil {
 		return "", err
 	}
 
-	filePath := filepath.Join(path, filename)
+	filePath := filepath.Join(dirPath, filename)
 
 	resp, err := http.Get(url)
 	if err != nil {
@@ -145,13 +144,6 @@ func downloadFile(url, path, filename string, executable bool) (string, error) {
 	_, err = io.Copy(out, resp.Body)
 	if err != nil {
 		return "", err
-	}
-
-	if executable {
-		err := os.Chmod(filePath, 0755)
-		if err != nil {
-			return "", err
-		}
 	}
 
 	return filePath, nil
@@ -180,7 +172,7 @@ func updateFile(file File) error {
 		}
 	}
 
-	_, err = downloadFile(file.downloadURL, filepath.Dir(file.filePath), "", file.executable)
+	_, err = downloadFile(file.downloadURL, filepath.Dir(file.filePath), "")
 	if err != nil {
 		return err
 	}
