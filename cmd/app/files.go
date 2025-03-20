@@ -9,25 +9,12 @@ import (
 	"os/user"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
 // Checks if a file exists
-func checkFileExists(path string) (bool, error) {
+func fileExists(path string) bool {
 	_, err := os.Stat(path)
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	return true, err
-}
-
-// Returns the modification time of a file
-func fileModTime(path string) (time.Time, error) {
-	info, err := os.Stat(path)
-	if err != nil {
-		return time.Time{}, err
-	}
-	return info.ModTime(), nil
+	return !os.IsNotExist(err)
 }
 
 // Handles ~, relative paths, and normalizes them
@@ -49,35 +36,80 @@ func expandPath(path string) (string, error) {
 	return filepath.Clean(absPath), nil
 }
 
-// Returns the published time of a GitHub release
-func getPublishedTime(apiURL string) (time.Time, error) {
+func getStoredReleaseTag(fileName string, versionFilePath string) (string, error) {
+	data, err := os.ReadFile(versionFilePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", nil // No stored version yet
+		}
+		return "", err
+	}
+
+	var versions map[string]string
+	if err := json.Unmarshal(data, &versions); err != nil {
+		return "", err
+	}
+
+	version, exists := versions[fileName]
+	if !exists {
+		return "", nil // File version not found
+	}
+
+	return version, nil
+}
+
+func updateStoredReleaseTag(fileName, newVersion, versionFilePath string) error {
+	data, err := os.ReadFile(versionFilePath)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	var versions map[string]string
+	if len(data) > 0 {
+		if err := json.Unmarshal(data, &versions); err != nil {
+			return err
+		}
+	} else {
+		versions = make(map[string]string)
+	}
+
+	versions[fileName] = newVersion
+
+	newData, err := json.MarshalIndent(versions, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(versionFilePath, newData, 0644)
+}
+
+// Returns the tag name of the latest GitHub release
+func getLatestReleaseTag(apiURL string) (string, error) {
 	resp, err := http.Get(apiURL)
 	if err != nil {
-		return time.Time{}, err
+		return "", err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return time.Time{}, fmt.Errorf("GitHub API request failed with status: %d", resp.StatusCode)
+		return "", fmt.Errorf("GitHub API request failed with status: %d", resp.StatusCode)
 	}
 
 	var release struct {
-		PublishedAt string `json:"published_at"`
+		TagName string `json:"tag_name"`
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
-		return time.Time{}, err
+		return "", err
 	}
 
-	parsedTime, err := time.Parse(time.RFC3339, release.PublishedAt)
-	if err != nil {
-		return time.Time{}, err
-	}
-
-	return parsedTime, nil
+	return release.TagName, nil
 }
 
-// Downloads a file from a given URL and saves it to a specified path
+// Downloads a file from a given URL and saves it to a specified path.
+// If a filename is provided, it will be used, otherwise the filename will be extracted
+// from the URL. If the executable flag is true, the file will be made executable
+// with permissions -rwxr-xr-x. Otherwise the permissions will be set based on umask.
 func downloadFile(url, path, filename string, executable bool) (string, error) {
 	if filename == "" {
 		parts := strings.Split(url, "/")
@@ -128,8 +160,30 @@ func downloadFile(url, path, filename string, executable bool) (string, error) {
 // Checks if the version of the file by the specified fullPath (including the filename)
 // can be updated to a newer version based on the latest release version from Github.
 // Updates the file if necessary.
-func updateFile(file File) (File, error) {
-	// TODO: Implement the updateFile function
+func updateFile(file File) error {
+	fileName := filepath.Base(file.filePath)
+	versionFilePath := filepath.Join(filepath.Dir(file.filePath), "versions.json")
 
-	return File{}, nil
+	latestReleaseTag, err := getLatestReleaseTag(file.releaseURL)
+	if err != nil {
+		return err
+	}
+
+	if fileExists(file.filePath) {
+		storedTag, err := getStoredReleaseTag(fileName, versionFilePath)
+		if err != nil {
+			return err
+		}
+
+		if storedTag == latestReleaseTag {
+			return nil
+		}
+	}
+
+	_, err = downloadFile(file.downloadURL, filepath.Dir(file.filePath), "", file.executable)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

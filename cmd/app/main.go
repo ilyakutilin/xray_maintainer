@@ -47,7 +47,7 @@ func main() {
 		executable:  true,
 	}
 	// TODO: Add error handling
-	xrayExecutable, _ = updateFile(xrayExecutable)
+	_ = updateFile(xrayExecutable)
 
 	geoipFile := File{
 		filePath:    filepath.Join(cfg.xrayDirPath, "geoip.dat"),
@@ -56,7 +56,7 @@ func main() {
 		executable:  false,
 	}
 	// TODO: Add error handling
-	geoipFile, _ = updateFile(geoipFile)
+	_ = updateFile(geoipFile)
 
 	geositeFile := File{
 		filePath:    filepath.Join(cfg.xrayDirPath, "geosite.dat"),
@@ -65,17 +65,17 @@ func main() {
 		executable:  false,
 	}
 	// TODO: Add error handling
-	geositeFile, _ = updateFile(geositeFile)
+	_ = updateFile(geositeFile)
 
-	// TODO: Add error handling
-	_ = updateWarp(cfg.xrayServerIP, cfg.xrayProtocol, cfg.xrayClientPort, cfg.ipCheckerURL, cfg.cfCredGenURL)
+	// // TODO: Add error handling
+	// _ = updateWarp(cfg.xrayServerIP, cfg.xrayProtocol, cfg.xrayClientPort, cfg.ipCheckerURL, cfg.cfCredGenURL)
 
-	// TODO: Add error handling
-	_ = restartService("xray")
-	xrayActive, _ := checkServiceStatus("xray")
-	if !xrayActive {
-		log.Fatal("XRay service failed to start")
-	}
+	// // TODO: Add error handling
+	// _ = restartService("xray")
+	// xrayActive, _ := checkServiceStatus("xray")
+	// if !xrayActive {
+	// 	log.Fatal("XRay service failed to start")
+	// }
 
 	// TODO: Remove print stmt
 	fmt.Println(cfg.xrayDirPath)
