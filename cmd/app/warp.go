@@ -59,7 +59,7 @@ func parseCFCreds(output string) (CFCreds, error) {
 	return result, nil
 }
 
-func updateWarp(xrayServerIP string, xrayProtocol string, xrayClientPort int, ipCheckerURL string, cfCredGenURL string) error {
-	// TODO: Implement the updateCFCreds function
+func updateWarp(warpConfig Warp) error {
+	// TODO: Implement the updateWarp function
 	return nil
 }

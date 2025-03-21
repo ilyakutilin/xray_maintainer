@@ -7,20 +7,25 @@ import (
 	"strconv"
 )
 
+// Holds the settings required for Cloudflare Warp
+type Warp struct {
+	xrayServerIP   string
+	xrayProtocol   string
+	xrayClientPort int
+	ipCheckerURL   string
+	cfCredGenURL   string
+}
+
 // Holds the application configuration
 type Config struct {
 	xrayDirPath            string
-	xrayServerIP           string
-	xrayProtocol           string
-	xrayClientPort         int
-	ipCheckerURL           string
-	cfCredGenURL           string
 	geoipReleaseInfoURL    string
 	geoipDownloadURL       string
 	geositeReleaseInfoURL  string
 	geositeDownloadURL     string
 	xrayCoreReleaseInfoURL string
 	xrayCoreDownloadURL    string
+	warp                   Warp
 }
 
 type AllowedTypes interface {
@@ -107,11 +112,11 @@ func loadConfig() (*Config, error) {
 	var err error
 
 	xrayDirPath := execFn(getPriorityString, *xrayDirPathFlag, "XRAY_DIR_PATH", "/opt/xray", &err)
-	cfg.xrayServerIP = execFn(getPriorityString, *xrayServerIPFlag, "XRAY_SERVER_IP", "", &err)
-	cfg.xrayProtocol = execFn(getPriorityString, *xrayProtocolFlag, "XRAY_PROTOCOL", "shadowsocks", &err)
-	cfg.xrayClientPort = execFn(getPriorityInt, *xrayClientPortFlag, "XRAY_CLIENT_PORT", 10801, &err)
-	cfg.ipCheckerURL = execFn(getPriorityString, *ipCheckerURLFlag, "IP_CHECKER_URL", "http://ip-api.com/json/", &err)
-	cfg.cfCredGenURL = execFn(getPriorityString, *cfCredGenURLFlag, "CF_CRED_GEN_URL", "https://github.com/badafans/warp-reg/releases/download/latest/main-linux-amd64", &err)
+	cfg.warp.xrayServerIP = execFn(getPriorityString, *xrayServerIPFlag, "XRAY_SERVER_IP", "", &err)
+	cfg.warp.xrayProtocol = execFn(getPriorityString, *xrayProtocolFlag, "XRAY_PROTOCOL", "shadowsocks", &err)
+	cfg.warp.xrayClientPort = execFn(getPriorityInt, *xrayClientPortFlag, "XRAY_CLIENT_PORT", 10801, &err)
+	cfg.warp.ipCheckerURL = execFn(getPriorityString, *ipCheckerURLFlag, "IP_CHECKER_URL", "http://ip-api.com/json/", &err)
+	cfg.warp.cfCredGenURL = execFn(getPriorityString, *cfCredGenURLFlag, "CF_CRED_GEN_URL", "https://github.com/badafans/warp-reg/releases/download/latest/main-linux-amd64", &err)
 	cfg.geoipReleaseInfoURL = execFn(getPriorityString, *geoipReleaseInfoURLFlag, "GEOIP_RELEASE_INFO_URL", "https://api.github.com/repos/v2fly/geoip/releases/latest", &err)
 	cfg.geoipDownloadURL = execFn(getPriorityString, *geoipDownloadURLFlag, "GEOIP_DOWNLOAD_URL", "https://github.com/v2fly/geoip/releases/latest/download/geoip.dat", &err)
 	cfg.geositeReleaseInfoURL = execFn(getPriorityString, *geositeReleaseInfoURLFlag, "GEOSITE_RELEASE_INFO_URL", "https://api.github.com/repos/v2fly/domain-list-community/releases/latest", &err)
