@@ -1,6 +1,7 @@
 package main
 
 import (
+	"archive/zip"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -150,12 +151,58 @@ func downloadFile(url, dirPath, filename string) (string, error) {
 	return filePath, nil
 }
 
-// TODO: Implement the function
-// unZip unzips a zip file into a temporary directory and returns a map of file paths,
-// where the keys are file names with extensions and the values are full paths to the
-// files in the unzipped temporary directory.
-func unZip(zipFilePath string) (map[string]string, error) {
-	return make(map[string]string), nil
+// extractFileFromZip checks if a zip archive by the provided zipFilePath contains
+// a file with the fileName. If there is no such file, returns an error.
+// If the file is found, it is extracted to the same directory as the zip archive,
+// and the full path to the extracted file is returned.
+func extractFileFromZip(zipFilePath string, fileName string) (string, error) {
+	// Open the zip archive
+	r, err := zip.OpenReader(zipFilePath)
+	if err != nil {
+		return "", err
+	}
+	defer r.Close()
+
+	// Loop through the files in the zip archive to find the file by the fileName
+	var foundFile *zip.File
+	for _, f := range r.File {
+		if f.Name == fileName {
+			foundFile = f
+			break
+		}
+	}
+
+	zipFileName := filepath.Base(zipFilePath)
+	if foundFile == nil {
+		return "", fmt.Errorf("file %s not found in zip archive %s", fileName, zipFileName)
+	}
+
+	// Extract the file to the same directory as the zip archive
+	destDir := filepath.Dir(zipFilePath)
+	destPath := filepath.Join(destDir, fileName)
+	outFile, err := os.Create(destPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to create output file %s: %w", fileName, err)
+	}
+	defer outFile.Close()
+
+	zipFileReader, err := foundFile.Open()
+	if err != nil {
+		return "", fmt.Errorf("failed to open file %s inside zip %s: %w", fileName, zipFileName, err)
+	}
+	defer zipFileReader.Close()
+
+	_, err = io.Copy(outFile, zipFileReader)
+	if err != nil {
+		return "", fmt.Errorf("failed to extract file %s from zip %s: %w", fileName, zipFileName, err)
+	}
+
+	// Delete the ZIP archive
+	if err := os.Remove(zipFilePath); err != nil {
+		return "", fmt.Errorf("failed to delete zip file %s: %w", zipFileName, err)
+	}
+
+	return destPath, nil
 }
 
 // Checks if the version of the file by the specified fullPath (including the filename)
@@ -187,6 +234,8 @@ func updateFile(file File) error {
 		if storedTag == latestReleaseTag {
 			logger.Info.Printf("%s file is already up-to-date, no further action required\n", fileName)
 			return nil
+		} else {
+			logger.Info.Printf("%s file is out-of-date, updating...\n", fileName)
 		}
 	} else {
 		logger.Info.Printf("%s file not found in %s, starting to download...\n", fileName, fileDir)
@@ -199,27 +248,22 @@ func updateFile(file File) error {
 	logger.Info.Printf("File downloaded: %s\n", downloadedFilePath)
 
 	if filepath.Ext(downloadedFilePath) == ".zip" {
-		logger.Info.Printf("Unzipping %s...\n", downloadedFilePath)
-		unzippedFiles, err := unZip(downloadedFilePath)
+		logger.Info.Printf("The downloaded file %s is a zip, so unzipping it...\n", filepath.Base(downloadedFilePath))
+
+		extractedFilePath, err := extractFileFromZip(downloadedFilePath, fileName)
 		if err != nil {
 			return err
 		}
-
-		var unzippedFile string
-		for fn, fp := range unzippedFiles {
-			if fn == fileName {
-				unzippedFile = fp
-				break
-			}
-		}
-
-		if unzippedFile == "" {
-			return fmt.Errorf("file %s not found in unzipped files", fileName)
-		}
-
-		logger.Info.Printf("Unzipped file: %s\n", unzippedFile)
-
+		logger.Info.Printf("File extracted: %s\n", extractedFilePath)
 	}
+
+	os.Rename(downloadedFilePath, file.filePath)
+
+	err = updateStoredReleaseTag(fileName, latestReleaseTag, versionFilePath)
+	if err != nil {
+		return err
+	}
+	logger.Info.Printf("The %s file has been updated to version %s\n", fileName, latestReleaseTag)
 
 	return nil
 }

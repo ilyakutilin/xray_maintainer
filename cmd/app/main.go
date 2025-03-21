@@ -26,6 +26,8 @@ func main() {
 		logger.Error.Fatalf("Error loading config: %v", err)
 	}
 
+	// TODO: Check that the workdir exists, and if not, create it
+
 	xrayExecutable := File{
 		filePath:    filepath.Join(cfg.xrayDirPath, "xray"),
 		releaseURL:  cfg.xrayCoreReleaseInfoURL,
@@ -34,13 +36,13 @@ func main() {
 	// TODO: Add error handling
 	_ = updateFile(xrayExecutable)
 
-	geoipFile := File{
-		filePath:    filepath.Join(cfg.xrayDirPath, "geoip.dat"),
-		releaseURL:  cfg.geoipReleaseInfoURL,
-		downloadURL: cfg.geoipDownloadURL,
-	}
-	// TODO: Add error handling
-	_ = updateFile(geoipFile)
+	// geoipFile := File{
+	// 	filePath:    filepath.Join(cfg.xrayDirPath, "geoip.dat"),
+	// 	releaseURL:  cfg.geoipReleaseInfoURL,
+	// 	downloadURL: cfg.geoipDownloadURL,
+	// }
+	// // TODO: Add error handling
+	// _ = updateFile(geoipFile)
 
 	geositeFile := File{
 		filePath:    filepath.Join(cfg.xrayDirPath, "geosite.dat"),
@@ -64,6 +66,4 @@ func main() {
 	fmt.Println(cfg.xrayDirPath)
 	fmt.Println(cfg.xrayServerIP)
 	fmt.Println(xrayExecutable)
-	fmt.Println(geoipFile)
-	fmt.Println(geositeFile)
 }
