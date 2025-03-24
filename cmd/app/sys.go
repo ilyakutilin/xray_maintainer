@@ -45,3 +45,18 @@ func checkServiceStatus(serviceName string) (bool, error) {
 	}
 	return output == "active", nil
 }
+
+func checkOperability(serviceName string) error {
+	err := restartService(serviceName)
+	if err != nil {
+		return err
+	}
+	isActive, err := checkServiceStatus(serviceName)
+	if err != nil {
+		return err
+	}
+	if !isActive {
+		return fmt.Errorf("%s service is not active", serviceName)
+	}
+	return nil
+}

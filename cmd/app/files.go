@@ -205,6 +205,21 @@ func extractFileFromZip(zipFilePath string, fileName string) (string, error) {
 	return destPath, nil
 }
 
+func backupFile(filePath string) (string, error) {
+	backupFilePath := filePath + ".backup"
+	if err := os.Rename(filePath, backupFilePath); err != nil {
+		return "", err
+	}
+	return backupFilePath, nil
+}
+
+func restoreFile(filePath, backupFilePath string) error {
+	if err := os.Rename(backupFilePath, filePath); err != nil {
+		return err
+	}
+	return nil
+}
+
 // Checks if the version of the file by the specified fullPath (including the filename)
 // can be updated to a newer version based on the latest release version from Github.
 // Updates the file if necessary.
@@ -224,6 +239,7 @@ func updateFile(file File) error {
 	logger.Info.Printf("The latest release tag for %s: %s\n", fileName, latestReleaseTag)
 
 	logger.Info.Printf("Looking for %s file in %s...\n", fileName, fileDir)
+	var backup string
 	if fileExists(file.filePath) {
 		logger.Info.Printf("%s file found in %s\n", fileName, fileDir)
 		storedTag, err := getStoredReleaseTag(fileName, versionFilePath)
@@ -236,6 +252,11 @@ func updateFile(file File) error {
 			return nil
 		} else {
 			logger.Info.Printf("%s file is out-of-date, updating...\n", fileName)
+			logger.Info.Println("Creating a backup file just in case...")
+			backup, err = backupFile(file.filePath)
+			if err != nil {
+				return err
+			}
 		}
 	} else {
 		logger.Info.Printf("%s file not found in %s, starting to download...\n", fileName, fileDir)
@@ -254,11 +275,27 @@ func updateFile(file File) error {
 		if err != nil {
 			return err
 		}
-		logger.Info.Printf("File extracted: %s\n", extractedFilePath)
+		logger.Info.Printf("File extracted and is available at %s\n", extractedFilePath)
+		logger.Info.Printf("Removing the zip file %s\n", downloadedFilePath)
+		if err = os.Remove(downloadedFilePath); err != nil {
+			return err
+		}
+	} else {
+		logger.Info.Printf("Renaming %s to %s\n", filepath.Base(downloadedFilePath), fileName)
+		err = os.Rename(downloadedFilePath, file.filePath)
+		if err != nil {
+			return err
+		}
 	}
 
-	os.Rename(downloadedFilePath, file.filePath)
+	logger.Info.Println("Checking operability of xray after the file update...")
+	if err = checkOperability("xray"); err != nil {
+		logger.Error.Printf("Something went wrong with the %s file update, restoring the backup file...\n", fileName)
+		err = restoreFile(file.filePath, backup)
+		return err
+	}
 
+	logger.Info.Println("Xray is active, updating the stored release tag...")
 	err = updateStoredReleaseTag(fileName, latestReleaseTag, versionFilePath)
 	if err != nil {
 		return err
