@@ -52,8 +52,8 @@ func main() {
 	// TODO: Add error handling
 	_ = updateFile(geositeFile)
 
-	// // TODO: Add error handling
-	// _ = updateWarp(cfg.xrayServerIP, cfg.xrayProtocol, cfg.xrayClientPort, cfg.ipCheckerURL, cfg.cfCredGenURL)
+	// TODO: Add error handling
+	_ = updateWarp(filepath.Join(cfg.xrayDirPath, "config.json"), cfg.warp)
 
 	// // TODO: Add error handling
 	// _ = restartService("xray")
