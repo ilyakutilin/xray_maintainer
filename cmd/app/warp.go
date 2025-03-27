@@ -1,8 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 )
@@ -14,6 +17,87 @@ type CFCreds struct {
 	V4        string
 	V6        string
 	Endpoint  string
+}
+
+type ServerConfig struct {
+	Log struct {
+		Loglevel string `json:"loglevel"`
+	} `json:"log"`
+	Inbounds []struct {
+		Protocol string `json:"protocol"`
+		Tag      string `json:"tag"`
+		Port     int    `json:"port"`
+		Listen   string `json:"listen,omitempty"`
+		Sniffing struct {
+			Enabled      bool     `json:"enabled"`
+			DestOverride []string `json:"destOverride"`
+		} `json:"sniffing"`
+		Settings struct {
+			Clients *[]struct {
+				ID    string `json:"id"`
+				Email string `json:"email"`
+				Flow  string `json:"flow,omitempty"`
+			} `json:"clients,omitempty"`
+			Decryption string `json:"decryption,omitempty"`
+			Method     string `json:"method,omitempty"`
+			Password   string `json:"password,omitempty"`
+			Network    string `json:"network,omitempty"`
+		} `json:"settings"`
+		StreamSettings *struct {
+			Network         string `json:"network"`
+			Security        string `json:"security,omitempty"`
+			RealitySettings *struct {
+				Show         bool     `json:"show"`
+				Dest         string   `json:"dest"`
+				Xver         int      `json:"xver"`
+				ServerNames  []string `json:"serverNames"`
+				PrivateKey   string   `json:"privateKey"`
+				MinClientVer string   `json:"minClientVer"`
+				MaxClientVer string   `json:"maxClientVer"`
+				MaxTimeDiff  int      `json:"maxTimeDiff"`
+				ShortIds     []string `json:"shortIds"`
+			} `json:"realitySettings,omitempty"`
+			KcpSettings *struct {
+				Mtu              int  `json:"mtu"`
+				Tti              int  `json:"tti"`
+				UplinkCapacity   int  `json:"uplinkCapacity"`
+				DownlinkCapacity int  `json:"downlinkCapacity"`
+				Congestion       bool `json:"congestion"`
+				ReadBufferSize   int  `json:"readBufferSize"`
+				WriteBufferSize  int  `json:"writeBufferSize"`
+				Header           struct {
+					Type string `json:"type"`
+				} `json:"header"`
+				Seed string `json:"seed"`
+			} `json:"kcpSettings,omitempty"`
+		} `json:"streamSettings,omitempty"`
+	} `json:"inbounds"`
+	Outbounds []struct {
+		Protocol string `json:"protocol"`
+		Tag      string `json:"tag"`
+		Settings *struct {
+			SecretKey string   `json:"secretKey"`
+			Address   []string `json:"address"`
+			Peers     []struct {
+				Endpoint  string `json:"endpoint"`
+				PublicKey string `json:"publicKey"`
+			} `json:"peers"`
+			Mtu            int    `json:"mtu"`
+			Reserved       []int  `json:"reserved"`
+			Workers        int    `json:"workers"`
+			DomainStrategy string `json:"domainStrategy"`
+		} `json:"settings,omitempty"`
+	} `json:"outbounds"`
+	Routing struct {
+		Rules []struct {
+			Type        string   `json:"type"`
+			OutboundTag string   `json:"outboundTag"`
+			Protocol    string   `json:"protocol,omitempty"`
+			Domain      []string `json:"domain,omitempty"`
+			IP          []string `json:"ip,omitempty"`
+		} `json:"rules"`
+		DomainStrategy string `json:"domainStrategy"`
+	} `json:"routing"`
 }
 
 // Parses the Cloudflare generator output. Tailored specifically for the output of
@@ -60,6 +144,50 @@ func parseCFCreds(output string) (CFCreds, error) {
 }
 
 func updateWarp(warpConfig Warp) error {
-	// TODO: Implement the updateWarp function
+	logger := GetLogger()
+
+	logger.Info.Println("Updating warp config...")
+	if !fileExists(warpConfig.xrayServerConfigPath) {
+		return errors.New("xray server config file does not exist")
+	}
+
+	file, err := os.Open(warpConfig.xrayServerConfigPath)
+	if err != nil {
+		return fmt.Errorf("error opening xray server config file: %w", err)
+	}
+	defer file.Close()
+
+	var xrayServerConfig ServerConfig
+	decoder := json.NewDecoder(file)
+	if err := decoder.Decode(&xrayServerConfig); err != nil {
+		return fmt.Errorf("error decoding JSON: %w", err)
+	}
+
+	logger.Info.Println("Successfully parsed xray server config...")
+
+	// TODO: Everything below is temporary for checking
+	// You actually need to download the CF cred generator, launch it, parse the output,
+	// write new values to the struct, and then write the struct to the json
+
+	for _, outbound := range xrayServerConfig.Outbounds {
+		if outbound.Protocol == "wireguard" {
+			outbound.Settings.SecretKey = "SOMEVERYSECURESECRETKEY"
+		}
+	}
+
+	// Open file for writing (or create if it doesn’t exist)
+	file, err = os.Create(filepath.Join(filepath.Dir(warpConfig.xrayServerConfigPath), "updated.json"))
+	if err != nil {
+		return fmt.Errorf("error creating file: %w", err)
+	}
+	defer file.Close()
+
+	// Create a JSON encoder and write to file
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "  ") // Pretty print JSON
+	if err := encoder.Encode(xrayServerConfig); err != nil {
+		return fmt.Errorf("error encoding JSON: %w", err)
+	}
+
 	return nil
 }

@@ -34,7 +34,7 @@ func main() {
 		downloadURL: cfg.xrayCoreDownloadURL,
 	}
 	// TODO: Add error handling
-	_ = updateFile(xrayExecutable)
+	_ = updateFile(xrayExecutable, true)
 
 	// geoipFile := File{
 	// 	filePath:    filepath.Join(cfg.xrayDirPath, "geoip.dat"),
@@ -50,10 +50,13 @@ func main() {
 		downloadURL: cfg.geositeDownloadURL,
 	}
 	// TODO: Add error handling
-	_ = updateFile(geositeFile)
+	_ = updateFile(geositeFile, true)
 
-	// // TODO: Add error handling
-	// _ = updateWarp(cfg.xrayServerIP, cfg.xrayProtocol, cfg.xrayClientPort, cfg.ipCheckerURL, cfg.cfCredGenURL)
+	// TODO: Add error handling
+	err = updateWarp(cfg.warp)
+	if err != nil {
+		logger.Error.Fatalf("Error updating warp config: %v", err)
+	}
 
 	// // TODO: Add error handling
 	// _ = restartService("xray")

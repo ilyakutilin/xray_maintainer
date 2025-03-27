@@ -4,16 +4,18 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 )
 
 // Holds the settings required for Cloudflare Warp
 type Warp struct {
-	xrayServerIP   string
-	xrayProtocol   string
-	xrayClientPort int
-	ipCheckerURL   string
-	cfCredGenURL   string
+	xrayServerConfigPath string
+	xrayServerIP         string
+	xrayProtocol         string
+	xrayClientPort       int
+	ipCheckerURL         string
+	cfCredGenURL         string
 }
 
 // Holds the application configuration
@@ -112,6 +114,7 @@ func loadConfig() (*Config, error) {
 	var err error
 
 	xrayDirPath := execFn(getPriorityString, *xrayDirPathFlag, "XRAY_DIR_PATH", "/opt/xray", &err)
+	cfg.warp.xrayServerConfigPath = filepath.Join(xrayDirPath, "config.json")
 	cfg.warp.xrayServerIP = execFn(getPriorityString, *xrayServerIPFlag, "XRAY_SERVER_IP", "", &err)
 	cfg.warp.xrayProtocol = execFn(getPriorityString, *xrayProtocolFlag, "XRAY_PROTOCOL", "shadowsocks", &err)
 	cfg.warp.xrayClientPort = execFn(getPriorityInt, *xrayClientPortFlag, "XRAY_CLIENT_PORT", 10801, &err)

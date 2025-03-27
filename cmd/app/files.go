@@ -37,6 +37,11 @@ func expandPath(path string) (string, error) {
 	return filepath.Clean(absPath), nil
 }
 
+// Makes a file executable
+func makeExecutable(filePath string) error {
+	return os.Chmod(filePath, 0755)
+}
+
 func getStoredReleaseTag(fileName string, versionFilePath string) (string, error) {
 	data, err := os.ReadFile(versionFilePath)
 	if err != nil {
@@ -223,7 +228,8 @@ func restoreFile(filePath, backupFilePath string) error {
 // Checks if the version of the file by the specified fullPath (including the filename)
 // can be updated to a newer version based on the latest release version from Github.
 // Updates the file if necessary.
-func updateFile(file File) error {
+// TODO: Remove skipOperabilityCheck flag
+func updateFile(file File, skipOperabilityCheck bool) error {
 	logger := GetLogger()
 
 	fileName := filepath.Base(file.filePath)
@@ -288,11 +294,15 @@ func updateFile(file File) error {
 		}
 	}
 
-	logger.Info.Println("Checking operability of xray after the file update...")
-	if err = checkOperability("xray"); err != nil {
-		logger.Error.Printf("Something went wrong with the %s file update, restoring the backup file...\n", fileName)
-		err = restoreFile(file.filePath, backup)
-		return err
+	// TODO: Operability check should not be optional
+	if !skipOperabilityCheck {
+		logger.Info.Println("Checking operability of xray after the file update...")
+		if err = checkOperability("xray"); err != nil {
+			logger.Error.Printf("Something went wrong with the %s file update, restoring the backup file...\n", fileName)
+			err = restoreFile(file.filePath, backup)
+			return err
+		}
+
 	}
 
 	logger.Info.Println("Xray is active, updating the stored release tag...")
