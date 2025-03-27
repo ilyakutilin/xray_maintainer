@@ -15,6 +15,7 @@ type Warp struct {
 	xrayProtocol         string
 	xrayClientPort       int
 	ipCheckerURL         string
+	cfCredGenPath        string
 	cfCredGenURL         string
 }
 
@@ -97,10 +98,12 @@ func loadConfig() (*Config, error) {
 	// by environment variables)
 	debugFlag := flag.Bool("debug", false, "Enable debug mode")
 	workdirPathFlag := flag.String("xray-dir-path", "", "Path of the xray server directory with the executable, config and geofiles")
+	xrayServerConfigFileNameFlag := flag.String("xray-server-config-filename", "", "Name of the XRay server config file")
 	xrayServerIPFlag := flag.String("xray-server-ip", "", "XRay server IP")
 	xrayProtocolFlag := flag.String("xray-protocol", "", "XRay protocol")
 	xrayClientPortFlag := flag.Int("xray-client-port", 0, "Port used by the test throwaway xray client")
 	ipCheckerURLFlag := flag.String("ip-checker-url", "", "IP checker service URL")
+	cfCredGenFileNameFlag := flag.String("cf-cred-gen-filename", "", "Name of the Cloudflare credential generator executable")
 	cfCredGenURLFlag := flag.String("cf-gen-url", "", "URL for downloading the Cloudflare credential generator")
 	geoipReleaseInfoURLFlag := flag.String("geoip-rel-url", "", "URL for fetching geoip release info")
 	geoipDownloadURLFlag := flag.String("geoip-dl-url", "", "URL for downloading a geoip.dat file")
@@ -118,6 +121,8 @@ func loadConfig() (*Config, error) {
 	var err error
 
 	workdirPath := execFn(getPriorityString, *workdirPathFlag, "WORKDIR_PATH", "/opt/xray", &err)
+	xrayServerConfigFileName := execFn(getPriorityString, *xrayServerConfigFileNameFlag, "XRAY_SERVER_CONFIG_FILENAME", "config.json", &err)
+	cfCredGenFileName := execFn(getPriorityString, *cfCredGenFileNameFlag, "CF_CRED_GEN_FILENAME", "main-linux-amd64", &err)
 	cfg.warp.xrayServerConfigPath = filepath.Join(workdirPath, "config.json")
 	cfg.warp.xrayServerIP = execFn(getPriorityString, *xrayServerIPFlag, "XRAY_SERVER_IP", "", &err)
 	cfg.warp.xrayProtocol = execFn(getPriorityString, *xrayProtocolFlag, "XRAY_PROTOCOL", "shadowsocks", &err)
@@ -136,10 +141,12 @@ func loadConfig() (*Config, error) {
 	}
 
 	cfg.workdirPath, err = expandPath(workdirPath)
-
 	if err != nil {
 		return nil, err
 	}
+
+	cfg.warp.xrayServerConfigPath = filepath.Join(cfg.workdirPath, xrayServerConfigFileName)
+	cfg.warp.cfCredGenPath = filepath.Join(cfg.workdirPath, cfCredGenFileName)
 
 	return cfg, nil
 }
