@@ -30,7 +30,7 @@ func main() {
 	// TODO: Check that the workdir exists, and if not, create it
 
 	xrayExecutable := File{
-		filePath:    filepath.Join(cfg.xrayDirPath, "xray"),
+		filePath:    filepath.Join(cfg.workdirPath, "xray"),
 		releaseURL:  cfg.xrayCoreReleaseInfoURL,
 		downloadURL: cfg.xrayCoreDownloadURL,
 	}
@@ -38,7 +38,7 @@ func main() {
 	_ = updateFile(xrayExecutable, cfg.debug)
 
 	// geoipFile := File{
-	// 	filePath:    filepath.Join(cfg.xrayDirPath, "geoip.dat"),
+	// 	filePath:    filepath.Join(cfg.workdirPath, "geoip.dat"),
 	// 	releaseURL:  cfg.geoipReleaseInfoURL,
 	// 	downloadURL: cfg.geoipDownloadURL,
 	// }
@@ -46,7 +46,7 @@ func main() {
 	// _ = updateFile(geoipFile, cfg.debug)
 
 	geositeFile := File{
-		filePath:    filepath.Join(cfg.xrayDirPath, "geosite.dat"),
+		filePath:    filepath.Join(cfg.workdirPath, "geosite.dat"),
 		releaseURL:  cfg.geositeReleaseInfoURL,
 		downloadURL: cfg.geositeDownloadURL,
 	}
@@ -67,7 +67,7 @@ func main() {
 	// }
 
 	// TODO: Remove print stmt
-	fmt.Println(cfg.xrayDirPath)
+	fmt.Println(cfg.workdirPath)
 	fmt.Println(cfg.warp.xrayServerIP)
 	fmt.Println(xrayExecutable)
 }

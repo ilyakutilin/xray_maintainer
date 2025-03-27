@@ -21,7 +21,7 @@ type Warp struct {
 // Holds the application configuration
 type Config struct {
 	debug                  bool
-	xrayDirPath            string
+	workdirPath            string
 	geoipReleaseInfoURL    string
 	geoipDownloadURL       string
 	geositeReleaseInfoURL  string
@@ -96,7 +96,7 @@ func loadConfig() (*Config, error) {
 	// Define CLI flags (there are no defaults for CLI flags since defaults are handled
 	// by environment variables)
 	debugFlag := flag.Bool("debug", false, "Enable debug mode")
-	xrayDirPathFlag := flag.String("xray-dir-path", "", "Path of the xray server directory with the executable, config and geofiles")
+	workdirPathFlag := flag.String("xray-dir-path", "", "Path of the xray server directory with the executable, config and geofiles")
 	xrayServerIPFlag := flag.String("xray-server-ip", "", "XRay server IP")
 	xrayProtocolFlag := flag.String("xray-protocol", "", "XRay protocol")
 	xrayClientPortFlag := flag.Int("xray-client-port", 0, "Port used by the test throwaway xray client")
@@ -117,8 +117,8 @@ func loadConfig() (*Config, error) {
 
 	var err error
 
-	xrayDirPath := execFn(getPriorityString, *xrayDirPathFlag, "XRAY_DIR_PATH", "/opt/xray", &err)
-	cfg.warp.xrayServerConfigPath = filepath.Join(xrayDirPath, "config.json")
+	workdirPath := execFn(getPriorityString, *workdirPathFlag, "WORKDIR_PATH", "/opt/xray", &err)
+	cfg.warp.xrayServerConfigPath = filepath.Join(workdirPath, "config.json")
 	cfg.warp.xrayServerIP = execFn(getPriorityString, *xrayServerIPFlag, "XRAY_SERVER_IP", "", &err)
 	cfg.warp.xrayProtocol = execFn(getPriorityString, *xrayProtocolFlag, "XRAY_PROTOCOL", "shadowsocks", &err)
 	cfg.warp.xrayClientPort = execFn(getPriorityInt, *xrayClientPortFlag, "XRAY_CLIENT_PORT", 10801, &err)
@@ -135,7 +135,7 @@ func loadConfig() (*Config, error) {
 		return nil, err
 	}
 
-	cfg.xrayDirPath, err = expandPath(xrayDirPath)
+	cfg.workdirPath, err = expandPath(workdirPath)
 
 	if err != nil {
 		return nil, err
