@@ -228,9 +228,8 @@ func restoreFile(filePath, backupFilePath string) error {
 // Checks if the version of the file by the specified fullPath (including the filename)
 // can be updated to a newer version based on the latest release version from Github.
 // Updates the file if necessary.
-// TODO: Remove skipOperabilityCheck flag
-func updateFile(file File, skipOperabilityCheck bool) error {
-	logger := GetLogger()
+func updateFile(file File, debug bool) error {
+	logger := GetLogger(debug)
 
 	fileName := filepath.Base(file.filePath)
 	fileDir := filepath.Dir(file.filePath)
@@ -294,8 +293,7 @@ func updateFile(file File, skipOperabilityCheck bool) error {
 		}
 	}
 
-	// TODO: Operability check should not be optional
-	if !skipOperabilityCheck {
+	if !debug {
 		logger.Info.Println("Checking operability of xray after the file update...")
 		if err = checkOperability("xray"); err != nil {
 			logger.Error.Printf("Something went wrong with the %s file update, restoring the backup file...\n", fileName)

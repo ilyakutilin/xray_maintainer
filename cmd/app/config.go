@@ -20,6 +20,7 @@ type Warp struct {
 
 // Holds the application configuration
 type Config struct {
+	debug                  bool
 	xrayDirPath            string
 	geoipReleaseInfoURL    string
 	geoipDownloadURL       string
@@ -78,22 +79,23 @@ func getPriorityInt(flagValue int, envKey string, defaultValue int) (int, error)
 }
 
 // Gets the value from flag > env var > default
-// func getPriorityBool(flagValue bool, envKey string, defaultValue bool) bool {
-// 	if flagValue {
-// 		return flagValue
-// 	}
-// 	if value, exists := os.LookupEnv(envKey); exists {
-// 		if boolValue, err := strconv.ParseBool(value); err == nil {
-// 			return boolValue
-// 		}
-// 	}
-// 	return defaultValue
-// }
+func getPriorityBool(flagValue bool, envKey string, defaultValue bool) bool {
+	if flagValue {
+		return flagValue
+	}
+	if value, exists := os.LookupEnv(envKey); exists {
+		if boolValue, err := strconv.ParseBool(value); err == nil {
+			return boolValue
+		}
+	}
+	return defaultValue
+}
 
 // Loads configuration from flags, environment variables, or defaults
 func loadConfig() (*Config, error) {
 	// Define CLI flags (there are no defaults for CLI flags since defaults are handled
 	// by environment variables)
+	debugFlag := flag.Bool("debug", false, "Enable debug mode")
 	xrayDirPathFlag := flag.String("xray-dir-path", "", "Path of the xray server directory with the executable, config and geofiles")
 	xrayServerIPFlag := flag.String("xray-server-ip", "", "XRay server IP")
 	xrayProtocolFlag := flag.String("xray-protocol", "", "XRay protocol")
@@ -110,6 +112,8 @@ func loadConfig() (*Config, error) {
 	flag.Parse()
 
 	cfg := &Config{}
+
+	cfg.debug = getPriorityBool(*debugFlag, "DEBUG", false)
 
 	var err error
 

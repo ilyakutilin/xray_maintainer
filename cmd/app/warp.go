@@ -143,8 +143,8 @@ func parseCFCreds(output string) (CFCreds, error) {
 	return result, nil
 }
 
-func updateWarp(warpConfig Warp) error {
-	logger := GetLogger()
+func updateWarp(warpConfig Warp, debug bool) error {
+	logger := GetLogger(debug)
 
 	logger.Info.Println("Updating warp config...")
 	if !fileExists(warpConfig.xrayServerConfigPath) {

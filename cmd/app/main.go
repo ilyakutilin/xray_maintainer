@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"path/filepath"
 
 	"github.com/joho/godotenv"
@@ -14,17 +15,17 @@ type File struct {
 }
 
 func main() {
-	logger := GetLogger()
-
 	err := godotenv.Load()
 	if err != nil {
-		logger.Info.Println("Could not load .env file - relying on flags and defaults...")
+		log.Fatal("Could not load .env file - relying on flags and defaults...")
 	}
 
 	cfg, err := loadConfig()
 	if err != nil {
-		logger.Error.Fatalf("Error loading config: %v", err)
+		log.Fatalf("Error loading config: %v", err)
 	}
+
+	logger := GetLogger(cfg.debug)
 
 	// TODO: Check that the workdir exists, and if not, create it
 
@@ -34,7 +35,7 @@ func main() {
 		downloadURL: cfg.xrayCoreDownloadURL,
 	}
 	// TODO: Add error handling
-	_ = updateFile(xrayExecutable, true)
+	_ = updateFile(xrayExecutable, cfg.debug)
 
 	// geoipFile := File{
 	// 	filePath:    filepath.Join(cfg.xrayDirPath, "geoip.dat"),
@@ -42,7 +43,7 @@ func main() {
 	// 	downloadURL: cfg.geoipDownloadURL,
 	// }
 	// // TODO: Add error handling
-	// _ = updateFile(geoipFile)
+	// _ = updateFile(geoipFile, cfg.debug)
 
 	geositeFile := File{
 		filePath:    filepath.Join(cfg.xrayDirPath, "geosite.dat"),
@@ -50,10 +51,10 @@ func main() {
 		downloadURL: cfg.geositeDownloadURL,
 	}
 	// TODO: Add error handling
-	_ = updateFile(geositeFile, true)
+	_ = updateFile(geositeFile, cfg.debug)
 
 	// TODO: Add error handling
-	err = updateWarp(cfg.warp)
+	err = updateWarp(cfg.warp, cfg.debug)
 	if err != nil {
 		logger.Error.Fatalf("Error updating warp config: %v", err)
 	}
