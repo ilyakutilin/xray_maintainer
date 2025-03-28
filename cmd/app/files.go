@@ -218,11 +218,26 @@ func backupFile(filePath string) (string, error) {
 	return backupFilePath, nil
 }
 
-func restoreFile(filePath, backupFilePath string) error {
-	if err := os.Rename(backupFilePath, filePath); err != nil {
+func restoreFile(src, dst string) error {
+	srcFile, err := os.Open(src)
+	if err != nil {
 		return err
 	}
-	return nil
+	defer srcFile.Close()
+
+	dstFile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer dstFile.Close()
+
+	_, err = io.Copy(dstFile, srcFile)
+	if err != nil {
+		return err
+	}
+
+	// Ensure data is written to disk
+	return dstFile.Sync()
 }
 
 // Checks if the version of the file by the specified fullPath (including the filename)
@@ -262,6 +277,12 @@ func updateFile(file File, debug bool) error {
 			if err != nil {
 				return err
 			}
+			defer func() {
+				err = os.Remove(backup)
+				if err != nil {
+					logger.Info.Printf("could not remove the backup file by path %s: %v", backup, err)
+				}
+			}()
 		}
 	} else {
 		logger.Info.Printf("%s file not found in %s, starting to download...\n", fileName, fileDir)
@@ -289,6 +310,7 @@ func updateFile(file File, debug bool) error {
 		logger.Info.Printf("Renaming %s to %s\n", filepath.Base(downloadedFilePath), fileName)
 		err = os.Rename(downloadedFilePath, file.filePath)
 		if err != nil {
+			os.Remove(downloadedFilePath)
 			return err
 		}
 	}
@@ -297,7 +319,7 @@ func updateFile(file File, debug bool) error {
 		logger.Info.Println("Checking operability of xray after the file update...")
 		if err = checkOperability("xray"); err != nil {
 			logger.Error.Printf("Something went wrong with the %s file update, restoring the backup file...\n", fileName)
-			err = restoreFile(file.filePath, backup)
+			err = restoreFile(backup, file.filePath)
 			return err
 		}
 
