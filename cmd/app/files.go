@@ -65,6 +65,10 @@ func getStoredReleaseTag(fileName string, versionFilePath string) (string, error
 }
 
 func updateStoredReleaseTag(fileName, newVersion, versionFilePath string) error {
+	if fileName == "" {
+		return fmt.Errorf("file name cannot be empty")
+	}
+
 	data, err := os.ReadFile(versionFilePath)
 	if err != nil && !os.IsNotExist(err) {
 		return err
