@@ -2,10 +2,10 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"os"
 	"os/user"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -133,14 +133,12 @@ func TestGetStoredReleaseTag(t *testing.T) {
 	versionsFile, cleanup := createTempFile(t)
 	t.Cleanup(cleanup)
 
-	// https://stackoverflow.com/questions/75489773/why-do-i-get-second-argument-to-errors-as-should-not-be-error-build-error-in
-	type Error error
-
 	var tests = []struct {
 		name           string
 		fileContents   []byte
 		expectedReturn string
-		expectedError  Error
+		// errors.As does not work with struct / loop approach, so using reflect
+		expectedError reflect.Type
 	}{
 		{
 			name:           "Versions file exists and has correct structure",
@@ -156,15 +154,15 @@ func TestGetStoredReleaseTag(t *testing.T) {
 		},
 		{
 			name:           "Versions file exists but is malformed",
-			fileContents:   []byte(`{"testfile":`),
+			fileContents:   []byte(`{"testfile": `),
 			expectedReturn: "",
-			expectedError:  &json.SyntaxError{},
+			expectedError:  reflect.TypeOf((*json.SyntaxError)(nil)),
 		},
 		{
 			name:           "Versions file has wrong type of value",
-			fileContents:   []byte(`{"testfile": 1}`),
+			fileContents:   []byte(`{"testfile": 5}`),
 			expectedReturn: "",
-			expectedError:  &json.UnmarshalTypeError{},
+			expectedError:  reflect.TypeOf((*json.UnmarshalTypeError)(nil)),
 		},
 	}
 
@@ -179,11 +177,14 @@ func TestGetStoredReleaseTag(t *testing.T) {
 			if test.expectedError == nil {
 				assertNoError(t, err)
 			} else {
-				if !errors.As(err, &test.expectedError) {
-					t.Error("Expected error does not match actual error")
+				actualErrType := reflect.TypeOf(err)
+				if actualErrType != test.expectedError {
+					t.Errorf("Expected an error of type %v but got %v", test.expectedError, actualErrType)
 				}
 			}
 		})
 	}
 
 }
+
+// func TestUpdateStoredReleaseTag(t *testing.T) {
