@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -9,16 +11,14 @@ import (
 	"testing"
 )
 
+// contains checks if string s contains substring substr
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && s[:len(substr)] == substr
+}
+
 func assertCorrectString(t testing.TB, want, got string) {
 	t.Helper()
 	if got != want {
-		t.Errorf("Expected %q, got %q", want, got)
-	}
-}
-
-func assertCorrectBytes(t testing.TB, want, got []byte) {
-	t.Helper()
-	if !reflect.DeepEqual(want, got) {
 		t.Errorf("Expected %q, got %q", want, got)
 	}
 }
@@ -273,4 +273,98 @@ func TestUpdateStoredReleaseTag(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGetLatestReleaseTag(t *testing.T) {
+	// Setup test cases
+	tests := []struct {
+		name           string
+		responseStatus int
+		responseBody   any
+		want           string
+		wantErr        bool
+		errMsg         string
+	}{
+		{
+			name:           "successful response",
+			responseStatus: http.StatusOK,
+			responseBody:   map[string]string{"tag_name": "v1.2.3"},
+			want:           "v1.2.3",
+			wantErr:        false,
+		},
+		{
+			name:           "non-200 status code",
+			responseStatus: http.StatusNotFound,
+			responseBody:   map[string]string{"message": "Not Found"},
+			wantErr:        true,
+			errMsg:         "GitHub API request failed with status: 404",
+		},
+		{
+			name:           "malformed JSON",
+			responseStatus: http.StatusOK,
+			responseBody:   "not json",
+			wantErr:        true,
+			errMsg:         "invalid character",
+		},
+		{
+			name:           "empty tag name",
+			responseStatus: http.StatusOK,
+			responseBody:   map[string]string{"tag_name": ""},
+			want:           "",
+			wantErr:        false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(tt.responseStatus)
+				switch body := tt.responseBody.(type) {
+				case string:
+					w.Write([]byte(body))
+				default:
+					json.NewEncoder(w).Encode(body)
+				}
+			}))
+			t.Cleanup(server.Close)
+
+			got, err := getLatestReleaseTag(server.URL)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("getLatestReleaseTag() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if tt.wantErr {
+				if tt.errMsg != "" && err.Error() != tt.errMsg {
+					if tt.errMsg != "" && !contains(err.Error(), tt.errMsg) {
+						t.Errorf("getLatestReleaseTag() error = %v, want error containing %q", err.Error(), tt.errMsg)
+					}
+				}
+				return
+			}
+
+			assertCorrectString(t, tt.want, got)
+		})
+	}
+}
+
+func TestGetLatestReleaseTag_NetworkError(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping network-dependent tests in short mode")
+	}
+
+	t.Run("invalid URL", func(t *testing.T) {
+		_, err := getLatestReleaseTag("http://invalid-url")
+		if err == nil {
+			t.Error("Expected error for invalid URL, got nil")
+		}
+	})
+
+	t.Run("connection refused", func(t *testing.T) {
+		_, err := getLatestReleaseTag("http://localhost:19999")
+		if err == nil {
+			t.Error("Expected error for connection refused, got nil")
+		}
+	})
 }
