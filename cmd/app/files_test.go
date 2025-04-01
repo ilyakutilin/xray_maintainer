@@ -3,6 +3,7 @@ package main
 import (
 	"archive/zip"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -107,7 +108,6 @@ func TestGetStoredReleaseTag(t *testing.T) {
 	})
 
 	versionsFile, cleanup := createTempFile(t)
-	t.Cleanup(cleanup)
 
 	var tests = []struct {
 		name           string
@@ -144,6 +144,7 @@ func TestGetStoredReleaseTag(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			t.Cleanup(cleanup)
 			err := os.WriteFile(versionsFile, test.fileContents, os.ModePerm)
 			if err != nil {
 				t.Fatalf("Failed to write test data: %v", err)
@@ -173,7 +174,6 @@ func TestUpdateStoredReleaseTag(t *testing.T) {
 	})
 
 	versionsFile, cleanup := createTempFile(t)
-	t.Cleanup(cleanup)
 
 	var tests = []struct {
 		name            string
@@ -221,6 +221,7 @@ func TestUpdateStoredReleaseTag(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			t.Cleanup(cleanup)
 			err := os.WriteFile(versionsFile, test.existingContent, os.ModePerm)
 			if err != nil {
 				t.Fatalf("Failed to write test data: %v", err)
@@ -496,52 +497,51 @@ func TestIsZipFile(t *testing.T) {
 		name     string
 		content  []byte
 		expected bool
-		setup    func(t testing.TB) (string, func()) // returns file path and cleanup func
+		setup    func(t testing.TB) string // returns file path
 	}{
 		{
 			name:     "valid zip file",
 			content:  []byte{0x50, 0x4B, 0x03, 0x04, 0x0A, 0x00, 0x00, 0x00},
 			expected: true,
-			setup:    createTempFile,
+			setup:    createTempFilePath,
 		},
 		{
 			name:     "empty zip file",
 			content:  []byte{0x50, 0x4B, 0x05, 0x06, 0x00, 0x00, 0x00, 0x00},
 			expected: true,
-			setup:    createTempFile,
+			setup:    createTempFilePath,
 		},
 		{
 			name:     "not a zip file",
 			content:  []byte("This is not a ZIP file"),
 			expected: false,
-			setup:    createTempFile,
+			setup:    createTempFilePath,
 		},
 		{
 			name:     "empty file",
 			content:  []byte{},
 			expected: false,
-			setup:    createTempFile,
+			setup:    createTempFilePath,
 		},
 		{
 			name:     "partial zip signature",
 			content:  []byte{0x50},
 			expected: false,
-			setup:    createTempFile,
+			setup:    createTempFilePath,
 		},
 		{
 			name:     "non-existent file",
 			content:  nil,
 			expected: false,
-			setup: func(t testing.TB) (string, func()) {
-				return "nonexistent_file_123456789", func() {}
+			setup: func(t testing.TB) string {
+				return "nonexistent_file_123456789"
 			},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			filePath, cleanup := test.setup(t)
-			t.Cleanup(cleanup)
+			filePath := test.setup(t)
 
 			// Only write content if this isn't the non-existent file test
 			if test.content != nil {
@@ -840,19 +840,155 @@ func TestRestoreFile(t *testing.T) {
 	})
 }
 
-// type MockFileDownloader struct{}
+type MockReleaseChecker struct{}
 
-// func (d MockFileDownloader) Download(filePath string, url string) error {
-// 	return os.WriteFile(filePath, []byte("mock content"), 0644)
-// }
+func (rc MockReleaseChecker) GetLatestReleaseTag(apiURL string) (string, error) {
+	return "1.2.3", nil
+}
 
-// func TestUpdateFile(t *testing.T) {
-// 	tempDir := t.TempDir()
+type FailReleaseChecker struct{}
 
-// 	file := File{
-// 		filePath:    filepath.Join(tempDir, "test.txt"),
-// 		releaseURL:  "https://example.com/test.txt",
-// 		downloadURL: "https://example.com/test.txt",
-// 		downloader:  MockFileDownloader{},
-// 	}
-// }
+func (rc FailReleaseChecker) GetLatestReleaseTag(apiURL string) (string, error) {
+	return "", errors.New("failed to get release tag")
+}
+
+type OrdinaryFileDownloader struct{}
+
+func (d OrdinaryFileDownloader) Download(filePath string, url string) error {
+	return os.WriteFile(filePath, []byte("mock content"), 0644)
+}
+
+type ZipFileDownloader struct{}
+
+func (d ZipFileDownloader) Download(filePath string, url string) error {
+	zipFile, err := os.Create(filePath)
+	if err != nil {
+		return err
+	}
+	defer zipFile.Close()
+
+	zipWriter := zip.NewWriter(zipFile)
+	defer zipWriter.Close()
+
+	w, err := zipWriter.Create(filepath.Base(filePath))
+	if err != nil {
+		return err
+	}
+	_, err = io.WriteString(w, "mock content")
+	return err
+}
+
+type FailFileDownloader struct{}
+
+func (d FailFileDownloader) Download(filePath string, url string) error {
+	return errors.New("failed to download file")
+}
+
+func TestUpdateFile(t *testing.T) {
+	tests := []struct {
+		name           string
+		oldContent     string
+		releaseChecker ReleaseChecker
+		downloader     FileDownloader
+		errorExpected  bool
+	}{
+		{
+			name:           "Update nonexistent file",
+			oldContent:     "",
+			releaseChecker: MockReleaseChecker{},
+			downloader:     OrdinaryFileDownloader{},
+			errorExpected:  false,
+		},
+		{
+			name:           "Update existing file",
+			oldContent:     "old content",
+			releaseChecker: MockReleaseChecker{},
+			downloader:     OrdinaryFileDownloader{},
+			errorExpected:  false,
+		},
+		{
+			name:           "Update existing zip file",
+			oldContent:     "old content",
+			releaseChecker: MockReleaseChecker{},
+			downloader:     ZipFileDownloader{},
+			errorExpected:  false,
+		},
+		{
+			name:           "Fail to get release tag",
+			oldContent:     "old content",
+			releaseChecker: FailReleaseChecker{},
+			downloader:     OrdinaryFileDownloader{},
+			errorExpected:  true,
+		},
+		{
+			name:           "Fail to download file",
+			oldContent:     "old content",
+			releaseChecker: MockReleaseChecker{},
+			downloader:     FailFileDownloader{},
+			errorExpected:  true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tempFile := createTempFilePath(t)
+
+			file := File{
+				filePath: tempFile,
+			}
+
+			if test.oldContent != "" {
+				err := os.WriteFile(file.filePath, []byte(test.oldContent), 0644)
+				if err != nil {
+					t.Fatalf("Failed to create file: %v", err)
+				}
+			}
+
+			file.releaseChecker = test.releaseChecker
+			file.downloader = test.downloader
+
+			err := updateFile(file, true)
+
+			if test.errorExpected {
+				assertError(t, err)
+				return
+			} else {
+				assertNoError(t, err)
+			}
+
+			content, err := os.ReadFile(file.filePath)
+			if err != nil {
+				t.Fatalf("Failed to read file: %v", err)
+			}
+			assertCorrectString(t, "mock content", string(content))
+
+			// Check that the versions file is updated
+			versionsFilePath := filepath.Join(filepath.Dir(file.filePath), "versions.json")
+			versionsContent, err := os.ReadFile(versionsFilePath)
+			if err != nil {
+				t.Fatalf("Failed to read versions file: %v", err)
+			}
+
+			var versions map[string]string
+			err = json.Unmarshal(versionsContent, &versions)
+			if err != nil {
+				t.Fatalf("Failed to unmarshal versions file: %v", err)
+			}
+
+			assertCorrectString(t, "1.2.3", versions[filepath.Base(file.filePath)])
+
+			// Check that there are no zip files in the folder
+			files, err := os.ReadDir(filepath.Dir(file.filePath))
+			if err != nil {
+				t.Fatalf("Failed to read directory: %v", err)
+			}
+
+			for _, f := range files {
+				if strings.HasSuffix(f.Name(), ".zip") {
+					t.Errorf("Found zip file %s in directory", f.Name())
+				}
+			}
+		})
+	}
+
+}

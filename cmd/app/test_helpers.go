@@ -3,6 +3,7 @@ package main
 import (
 	"math/rand"
 	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -39,14 +40,27 @@ func randomString(n int) string {
 	return string(b)
 }
 
+func createTempFilePath(t testing.TB) string {
+	t.Helper()
+	tempDir := t.TempDir()
+	return filepath.Join(tempDir, "temp-file-"+randomString(8)+".tmp")
+}
+
 func createTempFile(t testing.TB) (string, func()) {
 	t.Helper()
-	tempFile, err := os.CreateTemp("", "testfile_"+randomString(8))
+	tempFilePath := createTempFilePath(t)
+	f, err := os.Create(tempFilePath)
 	if err != nil {
-		t.Fatalf("Failed to create temp file: %v", err)
+		t.Fatal(err)
 	}
-	return tempFile.Name(), func() {
-		tempFile.Close()
-		os.Remove(tempFile.Name())
+	return tempFilePath, func() {
+		err := f.Close()
+		if err != nil {
+			t.Logf("The file %s is already closed", filepath.Base(tempFilePath))
+		}
+		err = os.Remove(tempFilePath)
+		if err != nil {
+			t.Logf("There is nothing to remove by path %s", tempFilePath)
+		}
 	}
 }

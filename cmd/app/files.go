@@ -365,12 +365,12 @@ func updateFile(file File, debug bool) error {
 		return err
 	}
 	if fileIsZip {
+		logger.Info.Printf("The downloaded file %s is a zip, so unzipping it...\n", filepath.Base(file.filePath))
 		zipFilePath := file.filePath + ".zip"
 		err = os.Rename(file.filePath, zipFilePath)
 		if err != nil {
 			return err
 		}
-		logger.Info.Printf("The downloaded file %s is a zip, so unzipping it...\n", filepath.Base(file.filePath))
 
 		extractedFilePath, err := extractFileFromZip(zipFilePath, fileName)
 		if err != nil {
@@ -378,9 +378,6 @@ func updateFile(file File, debug bool) error {
 		}
 		logger.Info.Printf("File extracted and is available at %s\n", extractedFilePath)
 		logger.Info.Printf("Removing the zip file %s\n", zipFilePath)
-		if err = os.Remove(zipFilePath); err != nil {
-			return err
-		}
 	}
 
 	if !debug {
