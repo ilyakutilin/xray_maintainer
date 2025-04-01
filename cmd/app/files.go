@@ -178,50 +178,6 @@ func (d GitHubFileDownloader) Download(filePath string, url string) error {
 	return nil
 }
 
-// Downloads a file from a given URL and saves it to a specified directory path.
-// If a filename is provided, it will be used, otherwise the filename will be extracted
-// from the URL. The permissions are set based on umask. Returns the full path
-// to the downloaded file.
-func downloadFile(url, dirPath, filename string) (string, error) {
-	if filename == "" {
-		parts := strings.Split(url, "/")
-		filename = parts[len(parts)-1]
-	}
-
-	if err := os.MkdirAll(dirPath, os.ModePerm); err != nil {
-		return "", err
-	}
-
-	filePath := filepath.Join(dirPath, filename)
-
-	resp, err := http.Get(url)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusNotFound {
-		return "", fmt.Errorf("file not found: %s", url)
-	}
-
-	if resp.StatusCode >= 400 {
-		return "", fmt.Errorf("failed to download file: HTTP %d", resp.StatusCode)
-	}
-
-	out, err := os.Create(filePath)
-	if err != nil {
-		return "", err
-	}
-	defer out.Close()
-
-	_, err = io.Copy(out, resp.Body)
-	if err != nil {
-		return "", err
-	}
-
-	return filePath, nil
-}
-
 // Checks if a file is a zip archive
 func isZipFile(filePath string) (bool, error) {
 	// Open the file

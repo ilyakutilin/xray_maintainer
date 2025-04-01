@@ -373,7 +373,7 @@ func TestGetLatestReleaseTag_NetworkError(t *testing.T) {
 	})
 }
 
-func TestDownloadFile(t *testing.T) {
+func TestDownload(t *testing.T) {
 	// Setup test server with various responses
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -388,56 +388,49 @@ func TestDownloadFile(t *testing.T) {
 			w.WriteHeader(http.StatusNotFound)
 		}
 	}))
-	defer mockServer.Close()
+	t.Cleanup(mockServer.Close)
 
 	tempDir := t.TempDir()
+	restrictedDir := filepath.Join(tempDir, "restricted")
+	err := os.MkdirAll(restrictedDir, 0555)
+	if err != nil {
+		t.Fatalf("Failed to create restricted dir: %v", err)
+	}
+
+	filePath := filepath.Join(tempDir, "testfile.txt")
+	downloader := GitHubFileDownloader{}
 
 	tests := []struct {
 		name        string
+		filePath    string
 		url         string
-		dirPath     string
-		filename    string
-		wantPath    string
 		wantErr     bool
 		errContains string
 	}{
 		{
-			name:     "success with filename",
+			name:     "successful download",
+			filePath: filePath,
 			url:      mockServer.URL + "/success",
-			dirPath:  tempDir,
-			filename: "testfile.txt",
-			wantPath: filepath.Join(tempDir, "testfile.txt"),
-			wantErr:  false,
-		},
-		{
-			name:     "success with empty filename",
-			url:      mockServer.URL + "/success",
-			dirPath:  tempDir,
-			filename: "",
-			wantPath: filepath.Join(tempDir, "success"),
 			wantErr:  false,
 		},
 		{
 			name:        "not found error",
+			filePath:    filePath,
 			url:         mockServer.URL + "/notfound",
-			dirPath:     tempDir,
-			filename:    "notfound.txt",
 			wantErr:     true,
 			errContains: "file not found",
 		},
 		{
 			name:        "server error",
+			filePath:    filePath,
 			url:         mockServer.URL + "/servererror",
-			dirPath:     tempDir,
-			filename:    "error.txt",
 			wantErr:     true,
 			errContains: "failed to download file: HTTP 500",
 		},
 		{
 			name:        "directory without permissions",
+			filePath:    filepath.Join(restrictedDir, "permissions.txt"),
 			url:         mockServer.URL + "/success",
-			dirPath:     "/rootdir",
-			filename:    "permissions.txt",
 			wantErr:     true,
 			errContains: "permission denied",
 		},
@@ -445,58 +438,56 @@ func TestDownloadFile(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			gotPath, err := downloadFile(test.url, test.dirPath, test.filename)
+			err := downloader.Download(test.filePath, test.url)
 			t.Cleanup(func() {
-				os.Remove(gotPath)
+				os.Remove(test.filePath)
 			})
 
 			if (err != nil) != test.wantErr {
-				t.Errorf("downloadFile() error = %v, wantErr %v", err, test.wantErr)
+				t.Errorf("Download() error = %v, wantErr %v", err, test.wantErr)
 				return
 			}
 
 			if test.wantErr {
 				if test.errContains != "" && !strings.Contains(err.Error(), test.errContains) {
-					t.Errorf("downloadFile() error = %v, want error containing %q", err, test.errContains)
+					t.Errorf("Download() error = %v, want error containing %q", err, test.errContains)
 				}
 				return
 			}
 
-			if gotPath != test.wantPath {
-				t.Errorf("downloadFile() = %v, want %v", gotPath, test.wantPath)
-			}
-
 			// Verify file was created with correct content
-			if _, err := os.Stat(gotPath); os.IsNotExist(err) {
-				t.Errorf("downloadFile() file %q was not created", gotPath)
+			if _, err := os.Stat(test.filePath); os.IsNotExist(err) {
+				t.Errorf("Download() file %q was not created", test.filePath)
 			}
 		})
 	}
 }
 
-func TestDownloadFile_NetworkErrors(t *testing.T) {
+func TestDownload_NetworkErrors(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping network error tests in short mode")
 	}
 
 	tempDir := t.TempDir()
+	filePath := filepath.Join(tempDir, "testfile.txt")
+	downloader := GitHubFileDownloader{}
 
 	t.Run("invalid URL", func(t *testing.T) {
-		_, err := downloadFile("http://invalid-url", tempDir, "test.txt")
+		err := downloader.Download(filePath, "http://invalid-url")
 		if err == nil {
 			t.Error("Expected error for invalid URL, got nil")
 		}
 	})
 
 	t.Run("connection refused", func(t *testing.T) {
-		_, err := downloadFile("http://localhost:19999", tempDir, "test.txt")
+		err := downloader.Download(filePath, "http://localhost:19999")
 		if err == nil {
 			t.Error("Expected error for connection refused, got nil")
 		}
 	})
 }
 
-func TestDownloadFile_FileCreation(t *testing.T) {
+func TestDownload_ExistingPath(t *testing.T) {
 	tempDir := t.TempDir()
 
 	t.Run("file already exists", func(t *testing.T) {
@@ -515,18 +506,19 @@ func TestDownloadFile_FileCreation(t *testing.T) {
 		}
 
 		// Try to download to same path
-		gotPath, err := downloadFile(server.URL, tempDir, "existing.txt")
+		downloader := GitHubFileDownloader{}
+		err = downloader.Download(filePath, server.URL)
 		if err != nil {
-			t.Errorf("downloadFile() error = %v, expected success", err)
+			t.Errorf("Download() error = %v, expected success", err)
 		}
 
 		// Verify file was overwritten
-		content, err := os.ReadFile(gotPath)
+		content, err := os.ReadFile(filePath)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if string(content) != "new content" {
-			t.Errorf("downloadFile() file content = %q, want %q", string(content), "new content")
+			t.Errorf("Download() file content = %q, want %q", string(content), "new content")
 		}
 	})
 }
