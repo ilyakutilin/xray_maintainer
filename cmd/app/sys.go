@@ -9,6 +9,7 @@ import (
 )
 
 // Checks if the app has sudo privileges
+// TODO: checkSudo() is currently used only in the tests - check implementation!
 func checkSudo() error {
 	if os.Geteuid() != 0 {
 		return errors.New("this application requires sudo/root privileges")
