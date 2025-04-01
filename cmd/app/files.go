@@ -187,14 +187,30 @@ func isZipFile(filePath string) (bool, error) {
 	}
 	defer file.Close()
 
-	// Read the first 4 bytes to check the signature
-	buf := make([]byte, 4)
-	_, err = file.Read(buf)
+	// Get file info to check size
+	fileInfo, err := file.Stat()
 	if err != nil {
 		return false, err
 	}
 
-	// ZIP file signature is "PK\x03\x04" or "PK\x05\x06" (empty archive) or "PK\x07\x08" (spanned archive)
+	// Empty file cannot be a zip
+	if fileInfo.Size() == 0 {
+		return false, nil
+	}
+
+	// Read the first 4 bytes to check the signature
+	buf := make([]byte, 4)
+	n, err := file.Read(buf)
+	if err != nil && err != io.EOF {
+		return false, err
+	}
+
+	// If we couldn't read at least 2 bytes, it's not a zip
+	if n < 2 {
+		return false, nil
+	}
+
+	// ZIP file signature is "PK" (0x50 0x4B)
 	return bytes.Equal(buf[:2], []byte{0x50, 0x4B}), nil
 }
 

@@ -15,43 +15,8 @@ import (
 	"testing"
 )
 
-// TODO: Move the helper functions to a separate file
-// TODO: Write more specific assert functions to replace inline handling
 // TODO: Unify cleanups (e.g. RemoveAll vs Remove)
 // TODO: Unify setups (e.g. create temp subdirs within the temp dir for diff tests)
-
-func assertCorrectString(t testing.TB, want, got string) {
-	t.Helper()
-	if got != want {
-		t.Errorf("Expected %q, got %q", want, got)
-	}
-}
-
-func assertError(t testing.TB, err error) {
-	t.Helper()
-	if err == nil {
-		t.Errorf("Wanted an error but didn't get one")
-	}
-}
-
-func assertNoError(t testing.TB, err error) {
-	t.Helper()
-	if err != nil {
-		t.Errorf("Wanted no error but got: %v", err)
-	}
-}
-
-func createTempFile(t testing.TB) (string, func()) {
-	t.Helper()
-	tempFile, err := os.CreateTemp("", "testfile")
-	if err != nil {
-		t.Fatalf("Failed to create temp file: %v", err)
-	}
-	return tempFile.Name(), func() {
-		tempFile.Close()
-		os.Remove(tempFile.Name())
-	}
-}
 
 func TestFileExists(t *testing.T) {
 	tempFile, cleanup := createTempFile(t)
@@ -521,6 +486,85 @@ func TestDownload_ExistingPath(t *testing.T) {
 			t.Errorf("Download() file content = %q, want %q", string(content), "new content")
 		}
 	})
+}
+
+func TestIsZipFile(t *testing.T) {
+	tests := []struct {
+		name     string
+		content  []byte
+		expected bool
+		setup    func(t testing.TB) (string, func()) // returns file path and cleanup func
+	}{
+		{
+			name:     "valid zip file",
+			content:  []byte{0x50, 0x4B, 0x03, 0x04, 0x0A, 0x00, 0x00, 0x00},
+			expected: true,
+			setup:    createTempFile,
+		},
+		{
+			name:     "empty zip file",
+			content:  []byte{0x50, 0x4B, 0x05, 0x06, 0x00, 0x00, 0x00, 0x00},
+			expected: true,
+			setup:    createTempFile,
+		},
+		{
+			name:     "not a zip file",
+			content:  []byte("This is not a ZIP file"),
+			expected: false,
+			setup:    createTempFile,
+		},
+		{
+			name:     "empty file",
+			content:  []byte{},
+			expected: false,
+			setup:    createTempFile,
+		},
+		{
+			name:     "partial zip signature",
+			content:  []byte{0x50},
+			expected: false,
+			setup:    createTempFile,
+		},
+		{
+			name:     "non-existent file",
+			content:  nil,
+			expected: false,
+			setup: func(t testing.TB) (string, func()) {
+				return "nonexistent_file_123456789", func() {}
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			filePath, cleanup := test.setup(t)
+			t.Cleanup(cleanup)
+
+			// Only write content if this isn't the non-existent file test
+			if test.content != nil {
+				err := os.WriteFile(filePath, test.content, 0644)
+				if err != nil {
+					t.Fatalf("Failed to create test file: %v", err)
+				}
+				defer os.Remove(filePath)
+			}
+
+			result, err := isZipFile(filePath)
+			if test.content == nil {
+				// For non-existent file, we expect an error
+				assertError(t, err)
+				return
+			}
+
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+
+			if result != test.expected {
+				t.Errorf("Expected %v, got %v", test.expected, result)
+			}
+		})
+	}
 }
 
 func TestExtractFileFromZip(t *testing.T) {
