@@ -2,12 +2,15 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"os/user"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -365,6 +368,164 @@ func TestGetLatestReleaseTag_NetworkError(t *testing.T) {
 		_, err := getLatestReleaseTag("http://localhost:19999")
 		if err == nil {
 			t.Error("Expected error for connection refused, got nil")
+		}
+	})
+}
+
+func TestDownloadFile(t *testing.T) {
+	// Setup test server with various responses
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/success":
+			w.WriteHeader(http.StatusOK)
+			io.WriteString(w, "file content")
+		case "/notfound":
+			w.WriteHeader(http.StatusNotFound)
+		case "/servererror":
+			w.WriteHeader(http.StatusInternalServerError)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer mockServer.Close()
+
+	tempDir := t.TempDir()
+
+	tests := []struct {
+		name        string
+		url         string
+		dirPath     string
+		filename    string
+		wantPath    string
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name:     "success with filename",
+			url:      mockServer.URL + "/success",
+			dirPath:  tempDir,
+			filename: "testfile.txt",
+			wantPath: filepath.Join(tempDir, "testfile.txt"),
+			wantErr:  false,
+		},
+		{
+			name:     "success with empty filename",
+			url:      mockServer.URL + "/success",
+			dirPath:  tempDir,
+			filename: "",
+			wantPath: filepath.Join(tempDir, "success"),
+			wantErr:  false,
+		},
+		{
+			name:        "not found error",
+			url:         mockServer.URL + "/notfound",
+			dirPath:     tempDir,
+			filename:    "notfound.txt",
+			wantErr:     true,
+			errContains: "file not found",
+		},
+		{
+			name:        "server error",
+			url:         mockServer.URL + "/servererror",
+			dirPath:     tempDir,
+			filename:    "error.txt",
+			wantErr:     true,
+			errContains: "failed to download file: HTTP 500",
+		},
+		{
+			name:        "invalid directory",
+			url:         mockServer.URL + "/success",
+			dirPath:     "/nonexistent/path/to/nowhere",
+			filename:    "test.txt",
+			wantErr:     true,
+			errContains: "no such file or directory",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			gotPath, err := downloadFile(test.url, test.dirPath, test.filename)
+			t.Cleanup(func() {
+				os.Remove(gotPath)
+			})
+
+			if (err != nil) != test.wantErr {
+				t.Errorf("downloadFile() error = %v, wantErr %v", err, test.wantErr)
+				return
+			}
+
+			if test.wantErr {
+				if test.errContains != "" && !strings.Contains(err.Error(), test.errContains) {
+					t.Errorf("downloadFile() error = %v, want error containing %q", err, test.errContains)
+				}
+				return
+			}
+
+			if gotPath != test.wantPath {
+				t.Errorf("downloadFile() = %v, want %v", gotPath, test.wantPath)
+			}
+
+			// Verify file was created with correct content
+			if _, err := os.Stat(gotPath); os.IsNotExist(err) {
+				t.Errorf("downloadFile() file %q was not created", gotPath)
+			}
+		})
+	}
+}
+
+func TestDownloadFile_NetworkErrors(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping network error tests in short mode")
+	}
+
+	tempDir := t.TempDir()
+
+	t.Run("invalid URL", func(t *testing.T) {
+		_, err := downloadFile("http://invalid-url", tempDir, "test.txt")
+		if err == nil {
+			t.Error("Expected error for invalid URL, got nil")
+		}
+	})
+
+	t.Run("connection refused", func(t *testing.T) {
+		_, err := downloadFile("http://localhost:19999", tempDir, "test.txt")
+		if err == nil {
+			t.Error("Expected error for connection refused, got nil")
+		}
+	})
+}
+
+func TestDownloadFile_FileCreation(t *testing.T) {
+	tempDir := t.TempDir()
+
+	t.Run("file already exists", func(t *testing.T) {
+		// Create test server
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprint(w, "new content")
+		}))
+		defer server.Close()
+
+		// Create file first
+		filePath := filepath.Join(tempDir, "existing.txt")
+		err := os.WriteFile(filePath, []byte("old content"), 0644)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Try to download to same path
+		gotPath, err := downloadFile(server.URL, tempDir, "existing.txt")
+		if err != nil {
+			t.Errorf("downloadFile() error = %v, expected success", err)
+		}
+
+		// Verify file was overwritten
+		content, err := os.ReadFile(gotPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(content) != "new content" {
+			t.Errorf("downloadFile() file content = %q, want %q", string(content), "new content")
 		}
 	})
 }
