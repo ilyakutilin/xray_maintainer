@@ -245,7 +245,8 @@ func TestUpdateStoredReleaseTag(t *testing.T) {
 }
 
 func TestGetLatestReleaseTag(t *testing.T) {
-	// Setup test cases
+	releaseChecker := GithubReleaseChecker{}
+
 	tests := []struct {
 		name           string
 		responseStatus int
@@ -297,7 +298,7 @@ func TestGetLatestReleaseTag(t *testing.T) {
 			}))
 			t.Cleanup(server.Close)
 
-			got, err := getLatestReleaseTag(server.URL)
+			got, err := releaseChecker.GetLatestReleaseTag(server.URL)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("getLatestReleaseTag() error = %v, wantErr %v", err, tt.wantErr)
@@ -323,15 +324,17 @@ func TestGetLatestReleaseTag_NetworkError(t *testing.T) {
 		t.Skip("skipping network-dependent tests in short mode")
 	}
 
+	releaseChecker := GithubReleaseChecker{}
+
 	t.Run("invalid URL", func(t *testing.T) {
-		_, err := getLatestReleaseTag("http://invalid-url")
+		_, err := releaseChecker.GetLatestReleaseTag("http://invalid-url")
 		if err == nil {
 			t.Error("Expected error for invalid URL, got nil")
 		}
 	})
 
 	t.Run("connection refused", func(t *testing.T) {
-		_, err := getLatestReleaseTag("http://localhost:19999")
+		_, err := releaseChecker.GetLatestReleaseTag("http://localhost:19999")
 		if err == nil {
 			t.Error("Expected error for connection refused, got nil")
 		}
@@ -836,3 +839,20 @@ func TestRestoreFile(t *testing.T) {
 		assertError(t, err)
 	})
 }
+
+// type MockFileDownloader struct{}
+
+// func (d MockFileDownloader) Download(filePath string, url string) error {
+// 	return os.WriteFile(filePath, []byte("mock content"), 0644)
+// }
+
+// func TestUpdateFile(t *testing.T) {
+// 	tempDir := t.TempDir()
+
+// 	file := File{
+// 		filePath:    filepath.Join(tempDir, "test.txt"),
+// 		releaseURL:  "https://example.com/test.txt",
+// 		downloadURL: "https://example.com/test.txt",
+// 		downloader:  MockFileDownloader{},
+// 	}
+// }

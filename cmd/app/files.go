@@ -13,25 +13,33 @@ import (
 	"strings"
 )
 
+type ReleaseChecker interface {
+	GetLatestReleaseTag(apiURL string) (string, error)
+}
+
 type FileDownloader interface {
 	Download(filePath string, url string) error
 }
 
 type File struct {
-	filePath    string
-	releaseURL  string
-	downloadURL string
-	downloader  FileDownloader
+	filePath       string
+	releaseURL     string
+	downloadURL    string
+	releaseChecker ReleaseChecker
+	downloader     FileDownloader
 }
+
+type GithubReleaseChecker struct{}
 
 type GitHubFileDownloader struct{}
 
 func NewFile(filePath, releaseURL, downloadURL string) File {
 	return File{
-		filePath:    filePath,
-		releaseURL:  releaseURL,
-		downloadURL: downloadURL,
-		downloader:  GitHubFileDownloader{},
+		filePath:       filePath,
+		releaseURL:     releaseURL,
+		downloadURL:    downloadURL,
+		releaseChecker: GithubReleaseChecker{},
+		downloader:     GitHubFileDownloader{},
 	}
 }
 
@@ -117,7 +125,7 @@ func updateStoredReleaseTag(fileName, newVersion, versionFilePath string) error 
 }
 
 // Returns the tag name of the latest GitHub release
-func getLatestReleaseTag(apiURL string) (string, error) {
+func (rc GithubReleaseChecker) GetLatestReleaseTag(apiURL string) (string, error) {
 	resp, err := http.Get(apiURL)
 	if err != nil {
 		return "", err
@@ -310,7 +318,7 @@ func updateFile(file File, debug bool) error {
 
 	logger.Info.Printf("Starting to update the %s file...\n", fileName)
 
-	latestReleaseTag, err := getLatestReleaseTag(file.releaseURL)
+	latestReleaseTag, err := file.releaseChecker.GetLatestReleaseTag(file.releaseURL)
 	if err != nil {
 		return err
 	}
