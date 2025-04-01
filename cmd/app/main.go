@@ -8,12 +8,6 @@ import (
 	"github.com/joho/godotenv"
 )
 
-type File struct {
-	filePath    string
-	releaseURL  string
-	downloadURL string
-}
-
 func main() {
 	err := godotenv.Load()
 	if err != nil {
@@ -29,27 +23,27 @@ func main() {
 
 	// TODO: Check that the workdir exists, and if not, create it
 
-	xrayExecutable := File{
-		filePath:    filepath.Join(cfg.workdirPath, "xray"),
-		releaseURL:  cfg.xrayCoreReleaseInfoURL,
-		downloadURL: cfg.xrayCoreDownloadURL,
-	}
+	xrayExecutable := NewFile(
+		filepath.Join(cfg.workdirPath, "xray"),
+		cfg.xrayCoreReleaseInfoURL,
+		cfg.xrayCoreDownloadURL,
+	)
 	// TODO: Add error handling
 	_ = updateFile(xrayExecutable, cfg.debug)
 
-	// geoipFile := File{
-	// 	filePath:    filepath.Join(cfg.workdirPath, "geoip.dat"),
-	// 	releaseURL:  cfg.geoipReleaseInfoURL,
-	// 	downloadURL: cfg.geoipDownloadURL,
-	// }
+	// geoipFile := NewFile(
+	// 	filepath.Join(cfg.workdirPath, "geoip.dat"),
+	// 	cfg.geoipReleaseInfoURL,
+	// 	cfg.geoipDownloadURL,
+	// )
 	// // TODO: Add error handling
 	// _ = updateFile(geoipFile, cfg.debug)
 
-	geositeFile := File{
-		filePath:    filepath.Join(cfg.workdirPath, "geosite.dat"),
-		releaseURL:  cfg.geositeReleaseInfoURL,
-		downloadURL: cfg.geositeDownloadURL,
-	}
+	geositeFile := NewFile(
+		filepath.Join(cfg.workdirPath, "geosite.dat"),
+		cfg.geositeReleaseInfoURL,
+		cfg.geositeDownloadURL,
+	)
 	// TODO: Add error handling
 	_ = updateFile(geositeFile, cfg.debug)
 

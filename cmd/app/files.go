@@ -2,6 +2,7 @@ package main
 
 import (
 	"archive/zip"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,6 +12,28 @@ import (
 	"path/filepath"
 	"strings"
 )
+
+type FileDownloader interface {
+	Download(filePath string, url string) error
+}
+
+type File struct {
+	filePath    string
+	releaseURL  string
+	downloadURL string
+	downloader  FileDownloader
+}
+
+type GitHubFileDownloader struct{}
+
+func NewFile(filePath, releaseURL, downloadURL string) File {
+	return File{
+		filePath:    filePath,
+		releaseURL:  releaseURL,
+		downloadURL: downloadURL,
+		downloader:  GitHubFileDownloader{},
+	}
+}
 
 // Checks if a file exists
 func fileExists(path string) bool {
@@ -120,6 +143,45 @@ func getLatestReleaseTag(apiURL string) (string, error) {
 // If a filename is provided, it will be used, otherwise the filename will be extracted
 // from the URL. The permissions are set based on umask. Returns the full path
 // to the downloaded file.
+func (d GitHubFileDownloader) Download(filePath string, url string) error {
+	dirPath := filepath.Dir(filePath)
+
+	if err := os.MkdirAll(dirPath, os.ModePerm); err != nil {
+		return err
+	}
+
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return fmt.Errorf("file not found: %s", url)
+	}
+
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("failed to download file: HTTP %d", resp.StatusCode)
+	}
+
+	out, err := os.Create(filePath)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, resp.Body)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Downloads a file from a given URL and saves it to a specified directory path.
+// If a filename is provided, it will be used, otherwise the filename will be extracted
+// from the URL. The permissions are set based on umask. Returns the full path
+// to the downloaded file.
 func downloadFile(url, dirPath, filename string) (string, error) {
 	if filename == "" {
 		parts := strings.Split(url, "/")
@@ -158,6 +220,26 @@ func downloadFile(url, dirPath, filename string) (string, error) {
 	}
 
 	return filePath, nil
+}
+
+// Checks if a file is a zip archive
+func isZipFile(filePath string) (bool, error) {
+	// Open the file
+	file, err := os.Open(filePath)
+	if err != nil {
+		return false, err
+	}
+	defer file.Close()
+
+	// Read the first 4 bytes to check the signature
+	buf := make([]byte, 4)
+	_, err = file.Read(buf)
+	if err != nil {
+		return false, err
+	}
+
+	// ZIP file signature is "PK\x03\x04" or "PK\x05\x06" (empty archive) or "PK\x07\x08" (spanned archive)
+	return bytes.Equal(buf[:2], []byte{0x50, 0x4B}), nil
 }
 
 // extractFileFromZip checks if a zip archive by the provided zipFilePath contains
@@ -292,29 +374,31 @@ func updateFile(file File, debug bool) error {
 		logger.Info.Printf("%s file not found in %s, starting to download...\n", fileName, fileDir)
 	}
 
-	downloadedFilePath, err := downloadFile(file.downloadURL, fileDir, "")
+	err = file.downloader.Download(file.filePath, file.downloadURL)
 	if err != nil {
 		return err
 	}
-	logger.Info.Printf("File downloaded: %s\n", downloadedFilePath)
+	logger.Info.Printf("File downloaded and is available at %s\n", file.filePath)
 
-	if filepath.Ext(downloadedFilePath) == ".zip" {
-		logger.Info.Printf("The downloaded file %s is a zip, so unzipping it...\n", filepath.Base(downloadedFilePath))
+	fileIsZip, err := isZipFile(file.filePath)
+	if err != nil {
+		return err
+	}
+	if fileIsZip {
+		zipFilePath := file.filePath + ".zip"
+		err = os.Rename(file.filePath, zipFilePath)
+		if err != nil {
+			return err
+		}
+		logger.Info.Printf("The downloaded file %s is a zip, so unzipping it...\n", filepath.Base(file.filePath))
 
-		extractedFilePath, err := extractFileFromZip(downloadedFilePath, fileName)
+		extractedFilePath, err := extractFileFromZip(zipFilePath, fileName)
 		if err != nil {
 			return err
 		}
 		logger.Info.Printf("File extracted and is available at %s\n", extractedFilePath)
-		logger.Info.Printf("Removing the zip file %s\n", downloadedFilePath)
-		if err = os.Remove(downloadedFilePath); err != nil {
-			return err
-		}
-	} else {
-		logger.Info.Printf("Renaming %s to %s\n", filepath.Base(downloadedFilePath), fileName)
-		err = os.Rename(downloadedFilePath, file.filePath)
-		if err != nil {
-			os.Remove(downloadedFilePath)
+		logger.Info.Printf("Removing the zip file %s\n", zipFilePath)
+		if err = os.Remove(zipFilePath); err != nil {
 			return err
 		}
 	}
