@@ -1,6 +1,7 @@
 package main
 
 import (
+	"archive/zip"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,6 +14,11 @@ import (
 	"strings"
 	"testing"
 )
+
+// TODO: Move the helper functions to a separate file
+// TODO: Write more specific assert functions to replace inline handling
+// TODO: Unify cleanups (e.g. RemoveAll vs Remove)
+// TODO: Unify setups (e.g. create temp subdirs within the temp dir for diff tests)
 
 // contains checks if string s contains substring substr
 func contains(s, substr string) bool {
@@ -340,7 +346,7 @@ func TestGetLatestReleaseTag(t *testing.T) {
 
 			if tt.wantErr {
 				if tt.errMsg != "" && err.Error() != tt.errMsg {
-					if tt.errMsg != "" && !contains(err.Error(), tt.errMsg) {
+					if tt.errMsg != "" && !strings.Contains(err.Error(), tt.errMsg) {
 						t.Errorf("getLatestReleaseTag() error = %v, want error containing %q", err.Error(), tt.errMsg)
 					}
 				}
@@ -528,4 +534,134 @@ func TestDownloadFile_FileCreation(t *testing.T) {
 			t.Errorf("downloadFile() file content = %q, want %q", string(content), "new content")
 		}
 	})
+}
+
+func TestExtractFileFromZip(t *testing.T) {
+	createZipFile := func(contents []byte, perm os.FileMode) string {
+		tempDir := filepath.Join(os.TempDir(), "test-zip")
+		if perm == 0 {
+			perm = 0755
+		}
+		err := os.MkdirAll(tempDir, perm)
+		if err != nil {
+			t.Fatalf("Failed to create temp dir: %v", err)
+		}
+
+		zipPath := filepath.Join(tempDir, "test.zip")
+
+		// Create a zip file for no permission test case
+		if perm&0200 == 0 {
+			return zipPath
+		}
+
+		zipFile, err := os.Create(zipPath)
+		if err != nil {
+			t.Fatalf("Failed to create zip file: %v", err)
+		}
+		defer zipFile.Close()
+
+		// Create a zip file for invalid zip file test case
+		if contents != nil {
+			err := os.WriteFile(zipPath, contents, 0644)
+			if err != nil {
+				t.Fatalf("Failed to create invalid zip: %v", err)
+			}
+			return zipPath
+		}
+
+		zipWriter := zip.NewWriter(zipFile)
+		defer zipWriter.Close()
+
+		// Add a file "testfile" with content "test content" to the zip file
+		w, err := zipWriter.Create("testfile.txt")
+		if err != nil {
+			t.Fatalf("Failed to create file in zip: %v", err)
+		}
+		_, err = io.WriteString(w, "test content")
+		if err != nil {
+			t.Fatalf("Failed to write to zip file: %v", err)
+		}
+
+		return zipPath
+	}
+
+	tests := []struct {
+		name        string
+		content     []byte
+		perm        os.FileMode
+		targetFile  string
+		wantContent string
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name:        "successful extraction",
+			targetFile:  "testfile.txt",
+			wantContent: "test content",
+		},
+		{
+			name:        "file not found in zip",
+			targetFile:  "nonexistent.txt",
+			wantErr:     true,
+			errContains: "not found in zip archive",
+		},
+		{
+			name:        "invalid zip file",
+			content:     []byte("not a zip file"),
+			targetFile:  "testfile.txt",
+			wantErr:     true,
+			errContains: "not a valid zip file",
+		},
+		{
+			name:        "permission error on extraction",
+			perm:        0444,
+			targetFile:  "testfile.txt",
+			wantErr:     true,
+			errContains: "permission denied",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			zipPath := createZipFile(test.content, test.perm)
+			t.Cleanup(func() {
+				err := os.RemoveAll(filepath.Dir(zipPath))
+				if err != nil {
+					t.Fatalf("Failed to remove temp dir: %v", err)
+				}
+			})
+
+			gotPath, err := extractFileFromZip(zipPath, test.targetFile)
+
+			if (err != nil) != test.wantErr {
+				t.Errorf("extractFileFromZip() error = %v, wantErr %v", err, test.wantErr)
+				return
+			}
+
+			if test.wantErr {
+				if test.errContains != "" && err != nil {
+					if err.Error() != "" && !strings.Contains(err.Error(), test.errContains) {
+						t.Errorf("extractFileFromZip() error = %v, should contain %v", err.Error(), test.errContains)
+					}
+				}
+				return
+			}
+
+			content, err := os.ReadFile(gotPath)
+			if err != nil {
+				t.Errorf("Failed to read extracted file: %v", err)
+			}
+			if string(content) != test.wantContent {
+				t.Errorf("Extracted file content = %v, want %v", string(content), test.wantContent)
+			}
+
+			if _, err := os.Stat(zipPath); !os.IsNotExist(err) {
+				err = os.Remove(zipPath)
+				if err != nil {
+					t.Fatalf("Failed to delete zip file: %v", err)
+				}
+				t.Errorf("Zip file was not deleted: %v", zipPath)
+			}
+		})
+	}
 }
