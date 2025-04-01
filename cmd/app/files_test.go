@@ -20,11 +20,6 @@ import (
 // TODO: Unify cleanups (e.g. RemoveAll vs Remove)
 // TODO: Unify setups (e.g. create temp subdirs within the temp dir for diff tests)
 
-// contains checks if string s contains substring substr
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && s[:len(substr)] == substr
-}
-
 func assertCorrectString(t testing.TB, want, got string) {
 	t.Helper()
 	if got != want {
@@ -664,4 +659,144 @@ func TestExtractFileFromZip(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestBackupFile(t *testing.T) {
+	t.Run("successful backup", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		originalPath := filepath.Join(tmpDir, "testfile.txt")
+		backupPath := originalPath + ".backup"
+
+		// Create a test file with content
+		err := os.WriteFile(originalPath, []byte("test content"), 0644)
+		if err != nil {
+			t.Fatalf("Failed to create test file: %v", err)
+		}
+
+		// Test backup
+		gotBackupPath, err := backupFile(originalPath)
+		if err != nil {
+			t.Fatalf("backupFile failed: %v", err)
+		}
+
+		// Verify backup path matches expected
+		if gotBackupPath != backupPath {
+			t.Errorf("Expected backup path %q, got %q", backupPath, gotBackupPath)
+		}
+
+		// Verify original file no longer exists
+		if _, err := os.Stat(originalPath); !os.IsNotExist(err) {
+			t.Errorf("Original file still exists after backup")
+		}
+
+		// Verify backup file exists and has correct content
+		content, err := os.ReadFile(backupPath)
+		if err != nil {
+			t.Fatalf("Failed to read backup file: %v", err)
+		}
+		assertCorrectString(t, "test content", string(content))
+	})
+
+	t.Run("non-existent file", func(t *testing.T) {
+		_, err := backupFile("nonexistentfile.txt")
+		assertError(t, err)
+	})
+
+	t.Run("permission denied", func(t *testing.T) {
+		if os.Getuid() == 0 {
+			t.Skip("Skipping permission test when running as root")
+		}
+
+		tmpDir := t.TempDir()
+		restrictedFile := filepath.Join(tmpDir, "restricted.txt")
+
+		// Create file but make parent directory read-only
+		err := os.WriteFile(restrictedFile, []byte("test"), 0644)
+		if err != nil {
+			t.Fatalf("Failed to create test file: %v", err)
+		}
+		err = os.Chmod(tmpDir, 0555) // Read-only directory
+		if err != nil {
+			t.Fatalf("Failed to change directory permissions: %v", err)
+		}
+		defer os.Chmod(tmpDir, 0755) // Clean up
+
+		_, err = backupFile(restrictedFile)
+		assertError(t, err)
+	})
+}
+
+func TestRestoreFile(t *testing.T) {
+	t.Run("successful restore", func(t *testing.T) {
+		// Create a temporary directory for testing
+		tmpDir := t.TempDir()
+		srcPath := filepath.Join(tmpDir, "source.txt")
+		dstPath := filepath.Join(tmpDir, "destination.txt")
+
+		// Create source file with content
+		err := os.WriteFile(srcPath, []byte("restore test content"), 0644)
+		if err != nil {
+			t.Fatalf("Failed to create source file: %v", err)
+		}
+
+		// Test restore
+		err = restoreFile(srcPath, dstPath)
+		if err != nil {
+			t.Fatalf("restoreFile failed: %v", err)
+		}
+
+		// Verify destination file exists and has correct content
+		content, err := os.ReadFile(dstPath)
+		if err != nil {
+			t.Fatalf("Failed to read destination file: %v", err)
+		}
+		assertCorrectString(t, "restore test content", string(content))
+
+		// Verify source file still exists (restore shouldn't delete it)
+		if _, err := os.Stat(srcPath); os.IsNotExist(err) {
+			t.Errorf("Source file was deleted during restore")
+		}
+	})
+
+	t.Run("non-existent source file", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		err := restoreFile("nonexistentfile.txt", filepath.Join(tmpDir, "dest.txt"))
+		assertError(t, err)
+	})
+
+	t.Run("unwritable destination", func(t *testing.T) {
+		if os.Getuid() == 0 {
+			t.Skip("Skipping permission test when running as root")
+		}
+
+		tmpDir := t.TempDir()
+		srcPath := filepath.Join(tmpDir, "source.txt")
+		err := os.WriteFile(srcPath, []byte("content"), 0644)
+		if err != nil {
+			t.Fatalf("Failed to create source file: %v", err)
+		}
+
+		// Create unwritable directory
+		unwritableDir := filepath.Join(tmpDir, "unwritable")
+		if err := os.Mkdir(unwritableDir, 0000); err != nil {
+			t.Fatalf("Failed to create unwritable directory: %v", err)
+		}
+		defer os.Chmod(unwritableDir, 0755) // Clean up permissions after test
+
+		err = restoreFile(srcPath, filepath.Join(unwritableDir, "dest.txt"))
+		assertError(t, err)
+	})
+
+	t.Run("destination directory doesn't exist", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		srcPath := filepath.Join(tmpDir, "source.txt")
+		err := os.WriteFile(srcPath, []byte("content"), 0644)
+		if err != nil {
+			t.Fatalf("Failed to create source file: %v", err)
+		}
+
+		nonexistentDir := filepath.Join(tmpDir, "nonexistent")
+		err = restoreFile(srcPath, filepath.Join(nonexistentDir, "dest.txt"))
+		assertError(t, err)
+	})
 }
