@@ -153,3 +153,96 @@ func TestRestartService(t *testing.T) {
 		})
 	}
 }
+
+func TestCheckServiceStatus(t *testing.T) {
+	tests := []struct {
+		name         string
+		serviceName  string
+		mockResponse string
+		mockError    error
+		expected     bool
+		expectErr    bool
+	}{
+		{
+			name:         "active service",
+			serviceName:  "nginx",
+			mockResponse: "active",
+			mockError:    nil,
+			expected:     true,
+			expectErr:    false,
+		},
+		{
+			name:         "inactive service",
+			serviceName:  "mysql",
+			mockResponse: "inactive",
+			mockError:    nil,
+			expected:     false,
+			expectErr:    false,
+		},
+		{
+			name:         "service not found",
+			serviceName:  "nonexistent",
+			mockResponse: "",
+			mockError:    fmt.Errorf("Unit nonexistent.service not found"),
+			expected:     false,
+			expectErr:    true,
+		},
+		{
+			name:         "command execution error",
+			serviceName:  "postgres",
+			mockResponse: "",
+			mockError:    fmt.Errorf("permission denied"),
+			expected:     false,
+			expectErr:    true,
+		},
+		{
+			name:         "unexpected output",
+			serviceName:  "redis",
+			mockResponse: "unknown-state",
+			mockError:    nil,
+			expected:     false,
+			expectErr:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockExecutor := func(cmd string) (string, error) {
+				expectedCmd := fmt.Sprintf("systemctl is-active %s", tt.serviceName)
+				if cmd != expectedCmd {
+					t.Errorf("expected command: %q, got: %q", expectedCmd, cmd)
+				}
+				return tt.mockResponse, tt.mockError
+			}
+
+			active, err := checkServiceStatus(tt.serviceName, mockExecutor)
+
+			if (err != nil) != tt.expectErr {
+				t.Errorf("expected error: %v, got: %v", tt.expectErr, err)
+			}
+
+			if active != tt.expected {
+				t.Errorf("expected active: %v, got: %v", tt.expected, active)
+			}
+		})
+	}
+}
+
+func TestCheckServiceStatusWithDefaultExecutor(t *testing.T) {
+	// Save original default executor
+	originalExecutor := defaultExecutor
+	defer func() { defaultExecutor = originalExecutor }()
+
+	// Set up mock default executor
+	defaultExecutor = func(cmd string) (string, error) {
+		return "active", nil
+	}
+
+	active, err := checkServiceStatus("nginx", nil)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !active {
+		t.Error("expected service to be active")
+	}
+}
