@@ -2,6 +2,7 @@ package main
 
 import (
 	"archive/zip"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,6 +12,36 @@ import (
 	"path/filepath"
 	"strings"
 )
+
+type ReleaseChecker interface {
+	GetLatestReleaseTag(apiURL string) (string, error)
+}
+
+type FileDownloader interface {
+	Download(filePath string, url string) error
+}
+
+type File struct {
+	filePath       string
+	releaseURL     string
+	downloadURL    string
+	releaseChecker ReleaseChecker
+	downloader     FileDownloader
+}
+
+type GithubReleaseChecker struct{}
+
+type GitHubFileDownloader struct{}
+
+func NewFile(filePath, releaseURL, downloadURL string) File {
+	return File{
+		filePath:       filePath,
+		releaseURL:     releaseURL,
+		downloadURL:    downloadURL,
+		releaseChecker: GithubReleaseChecker{},
+		downloader:     GitHubFileDownloader{},
+	}
+}
 
 // Checks if a file exists
 func fileExists(path string) bool {
@@ -65,6 +96,10 @@ func getStoredReleaseTag(fileName string, versionFilePath string) (string, error
 }
 
 func updateStoredReleaseTag(fileName, newVersion, versionFilePath string) error {
+	if fileName == "" {
+		return fmt.Errorf("file name cannot be empty")
+	}
+
 	data, err := os.ReadFile(versionFilePath)
 	if err != nil && !os.IsNotExist(err) {
 		return err
@@ -90,7 +125,7 @@ func updateStoredReleaseTag(fileName, newVersion, versionFilePath string) error 
 }
 
 // Returns the tag name of the latest GitHub release
-func getLatestReleaseTag(apiURL string) (string, error) {
+func (rc GithubReleaseChecker) GetLatestReleaseTag(apiURL string) (string, error) {
 	resp, err := http.Get(apiURL)
 	if err != nil {
 		return "", err
@@ -116,44 +151,75 @@ func getLatestReleaseTag(apiURL string) (string, error) {
 // If a filename is provided, it will be used, otherwise the filename will be extracted
 // from the URL. The permissions are set based on umask. Returns the full path
 // to the downloaded file.
-func downloadFile(url, dirPath, filename string) (string, error) {
-	if filename == "" {
-		parts := strings.Split(url, "/")
-		filename = parts[len(parts)-1]
-	}
+func (d GitHubFileDownloader) Download(filePath string, url string) error {
+	dirPath := filepath.Dir(filePath)
 
 	if err := os.MkdirAll(dirPath, os.ModePerm); err != nil {
-		return "", err
+		return err
 	}
-
-	filePath := filepath.Join(dirPath, filename)
 
 	resp, err := http.Get(url)
 	if err != nil {
-		return "", err
+		return err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNotFound {
-		return "", fmt.Errorf("file not found: %s", url)
+		return fmt.Errorf("file not found: %s", url)
 	}
 
 	if resp.StatusCode >= 400 {
-		return "", fmt.Errorf("failed to download file: HTTP %d", resp.StatusCode)
+		return fmt.Errorf("failed to download file: HTTP %d", resp.StatusCode)
 	}
 
 	out, err := os.Create(filePath)
 	if err != nil {
-		return "", err
+		return err
 	}
 	defer out.Close()
 
 	_, err = io.Copy(out, resp.Body)
 	if err != nil {
-		return "", err
+		return err
 	}
 
-	return filePath, nil
+	return nil
+}
+
+// Checks if a file is a zip archive
+func isZipFile(filePath string) (bool, error) {
+	// Open the file
+	file, err := os.Open(filePath)
+	if err != nil {
+		return false, err
+	}
+	defer file.Close()
+
+	// Get file info to check size
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return false, err
+	}
+
+	// Empty file cannot be a zip
+	if fileInfo.Size() == 0 {
+		return false, nil
+	}
+
+	// Read the first 4 bytes to check the signature
+	buf := make([]byte, 4)
+	n, err := file.Read(buf)
+	if err != nil && err != io.EOF {
+		return false, err
+	}
+
+	// If we couldn't read at least 2 bytes, it's not a zip
+	if n < 2 {
+		return false, nil
+	}
+
+	// ZIP file signature is "PK" (0x50 0x4B)
+	return bytes.Equal(buf[:2], []byte{0x50, 0x4B}), nil
 }
 
 // extractFileFromZip checks if a zip archive by the provided zipFilePath contains
@@ -252,7 +318,7 @@ func updateFile(file File, debug bool) error {
 
 	logger.Info.Printf("Starting to update the %s file...\n", fileName)
 
-	latestReleaseTag, err := getLatestReleaseTag(file.releaseURL)
+	latestReleaseTag, err := file.releaseChecker.GetLatestReleaseTag(file.releaseURL)
 	if err != nil {
 		return err
 	}
@@ -288,36 +354,35 @@ func updateFile(file File, debug bool) error {
 		logger.Info.Printf("%s file not found in %s, starting to download...\n", fileName, fileDir)
 	}
 
-	downloadedFilePath, err := downloadFile(file.downloadURL, fileDir, "")
+	err = file.downloader.Download(file.filePath, file.downloadURL)
 	if err != nil {
 		return err
 	}
-	logger.Info.Printf("File downloaded: %s\n", downloadedFilePath)
+	logger.Info.Printf("File downloaded and is available at %s\n", file.filePath)
 
-	if filepath.Ext(downloadedFilePath) == ".zip" {
-		logger.Info.Printf("The downloaded file %s is a zip, so unzipping it...\n", filepath.Base(downloadedFilePath))
+	fileIsZip, err := isZipFile(file.filePath)
+	if err != nil {
+		return err
+	}
+	if fileIsZip {
+		logger.Info.Printf("The downloaded file %s is a zip, so unzipping it...\n", filepath.Base(file.filePath))
+		zipFilePath := file.filePath + ".zip"
+		err = os.Rename(file.filePath, zipFilePath)
+		if err != nil {
+			return err
+		}
 
-		extractedFilePath, err := extractFileFromZip(downloadedFilePath, fileName)
+		extractedFilePath, err := extractFileFromZip(zipFilePath, fileName)
 		if err != nil {
 			return err
 		}
 		logger.Info.Printf("File extracted and is available at %s\n", extractedFilePath)
-		logger.Info.Printf("Removing the zip file %s\n", downloadedFilePath)
-		if err = os.Remove(downloadedFilePath); err != nil {
-			return err
-		}
-	} else {
-		logger.Info.Printf("Renaming %s to %s\n", filepath.Base(downloadedFilePath), fileName)
-		err = os.Rename(downloadedFilePath, file.filePath)
-		if err != nil {
-			os.Remove(downloadedFilePath)
-			return err
-		}
+		logger.Info.Printf("Removing the zip file %s\n", zipFilePath)
 	}
 
 	if !debug {
 		logger.Info.Println("Checking operability of xray after the file update...")
-		if err = checkOperability("xray"); err != nil {
+		if err = checkOperability("xray", nil); err != nil {
 			logger.Error.Printf("Something went wrong with the %s file update, restoring the backup file...\n", fileName)
 			err = restoreFile(backup, file.filePath)
 			return err
