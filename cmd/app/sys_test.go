@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"strings"
@@ -113,4 +114,42 @@ func TestExecuteCommand(t *testing.T) {
 			t.Errorf("expected exec.ExitError, got %T", err)
 		}
 	})
+}
+
+func TestRestartService(t *testing.T) {
+	tests := []struct {
+		name        string
+		serviceName string
+		mockExec    func(string) (string, error)
+		wantErr     bool
+	}{
+		{
+			name:        "successful restart",
+			serviceName: "nginx",
+			mockExec: func(cmd string) (string, error) {
+				if cmd != "sudo systemctl restart nginx" {
+					return "", fmt.Errorf("unexpected command")
+				}
+				return "", nil
+			},
+			wantErr: false,
+		},
+		{
+			name:        "failed restart",
+			serviceName: "mysql",
+			mockExec: func(cmd string) (string, error) {
+				return "", fmt.Errorf("permission denied")
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := restartService(tt.serviceName, tt.mockExec)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("restartService() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
 }
