@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/user"
 	"strings"
 	"testing"
 )
@@ -244,5 +245,98 @@ func TestCheckServiceStatusWithDefaultExecutor(t *testing.T) {
 	}
 	if !active {
 		t.Error("expected service to be active")
+	}
+}
+
+func TestCheckOperability(t *testing.T) {
+	tests := []struct {
+		name           string
+		serviceName    string
+		restartErr     error
+		isActive       bool
+		checkStatusErr error
+		expectedErr    error
+	}{
+		{
+			name:        "successful operation",
+			serviceName: "nginx",
+			restartErr:  nil,
+			isActive:    true,
+			expectedErr: nil,
+		},
+		{
+			name:        "restart failure",
+			serviceName: "mysql",
+			restartErr:  errors.New("permission denied"),
+			expectedErr: errors.New("permission denied"),
+		},
+		{
+			name:           "status check failure",
+			serviceName:    "redis",
+			restartErr:     nil,
+			checkStatusErr: errors.New("service not found"),
+			expectedErr:    errors.New("service not found"),
+		},
+		{
+			name:        "service not active after restart",
+			serviceName: "postgres",
+			restartErr:  nil,
+			isActive:    false,
+			expectedErr: fmt.Errorf("postgres service is not active"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockExecutor := func(cmd string) (string, error) {
+				if strings.Contains(cmd, "sudo systemctl restart") {
+					if tt.restartErr != nil {
+						return "", tt.restartErr
+					}
+					return "", nil
+				}
+				if strings.Contains(cmd, "systemctl is-active") {
+					if tt.checkStatusErr != nil {
+						return "", tt.checkStatusErr
+					}
+					if tt.isActive {
+						return "active", nil
+					}
+					return "inactive", nil
+				}
+				return "", nil
+			}
+
+			err := checkOperability(tt.serviceName, mockExecutor)
+
+			// Test error conditions
+			if tt.expectedErr == nil && err != nil {
+				t.Errorf("expected no error, got %v", err)
+			}
+			if tt.expectedErr != nil && err == nil {
+				t.Errorf("expected error %v, got nil", tt.expectedErr)
+			}
+			if tt.expectedErr != nil && err != nil && tt.expectedErr.Error() != err.Error() {
+				t.Errorf("expected error %v, got %v", tt.expectedErr, err)
+			}
+		})
+	}
+}
+
+func TestCheckOperabilityIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	currentUser, err := user.Current()
+	if err != nil || currentUser.Uid != "0" {
+		t.Skip("Skipping integration test - requires root privileges")
+	}
+
+	// Test with a real service that should exist on most systems
+	serviceName := "cron"
+	err = checkOperability(serviceName, nil)
+	if err != nil {
+		t.Errorf("checkOperability failed: %v", err)
 	}
 }
