@@ -16,6 +16,20 @@ func assertCorrectString(t testing.TB, want, got string) {
 	}
 }
 
+func assertCorrectInt(t testing.TB, want, got int) {
+	t.Helper()
+	if got != want {
+		t.Errorf("Expected %d, got %d", want, got)
+	}
+}
+
+func assertCorrectBool(t testing.TB, want, got bool) {
+	t.Helper()
+	if got != want {
+		t.Errorf("Expected %t, got %t", want, got)
+	}
+}
+
 func assertError(t testing.TB, err error) {
 	t.Helper()
 	if err == nil {

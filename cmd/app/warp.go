@@ -143,26 +143,47 @@ func parseCFCreds(output string) (CFCreds, error) {
 	return result, nil
 }
 
+// parseJSONFile reads a JSON file and decodes it into the given target.
+// target must be a non-nil pointer to a struct/map/slice that matches the JSON structure.
+// If strict is true, unknown fields in the JSON file will result in an error.
+// Returns an error if file reading or JSON parsing fails.
+func parseJSONFile[T any](jsonFilePath string, target *T, strict bool) error {
+	if target == nil {
+		return fmt.Errorf("target must be a non-nil pointer")
+	}
+
+	if !fileExists(jsonFilePath) {
+		return fmt.Errorf("file %q does not exist", filepath.Base(jsonFilePath))
+	}
+
+	file, err := os.Open(jsonFilePath)
+	if err != nil {
+		return fmt.Errorf("failed to open JSON file %q: %w", jsonFilePath, err)
+	}
+	defer file.Close()
+
+	decoder := json.NewDecoder(file)
+
+	if strict {
+		decoder.DisallowUnknownFields()
+	}
+
+	if err := decoder.Decode(target); err != nil {
+		return fmt.Errorf("failed to decode JSON from %q: %w", jsonFilePath, err)
+	}
+
+	return nil
+}
+
 func updateWarp(warpConfig Warp, debug bool) error {
 	logger := GetLogger(debug)
 
 	logger.Info.Println("Updating warp config...")
-	if !fileExists(warpConfig.xrayServerConfigPath) {
-		return errors.New("xray server config file does not exist")
+	logger.Info.Println("Parsing the existing xray config...")
+	xrayServerConfig := ServerConfig{}
+	if err := parseJSONFile(warpConfig.xrayServerConfigPath, &xrayServerConfig, true); err != nil {
+		return fmt.Errorf("error parsing xray server config at path %q: %w", warpConfig.xrayServerConfigPath, err)
 	}
-
-	file, err := os.Open(warpConfig.xrayServerConfigPath)
-	if err != nil {
-		return fmt.Errorf("error opening xray server config file: %w", err)
-	}
-	defer file.Close()
-
-	var xrayServerConfig ServerConfig
-	decoder := json.NewDecoder(file)
-	if err := decoder.Decode(&xrayServerConfig); err != nil {
-		return fmt.Errorf("error decoding JSON: %w", err)
-	}
-
 	logger.Info.Println("Successfully parsed xray server config...")
 
 	// TODO: Everything below is temporary for checking
@@ -176,7 +197,7 @@ func updateWarp(warpConfig Warp, debug bool) error {
 	}
 
 	// Open file for writing (or create if it doesn’t exist)
-	file, err = os.Create(filepath.Join(filepath.Dir(warpConfig.xrayServerConfigPath), "updated.json"))
+	file, err := os.Create(filepath.Join(filepath.Dir(warpConfig.xrayServerConfigPath), "updated.json"))
 	if err != nil {
 		return fmt.Errorf("error creating file: %w", err)
 	}
