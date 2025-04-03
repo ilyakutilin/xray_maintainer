@@ -1,9 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"math/rand"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -42,6 +44,42 @@ func assertNoError(t testing.TB, err error) {
 	if err != nil {
 		t.Errorf("Wanted no error but got: %v", err)
 	}
+}
+
+// assertPanics checks if fn() panics, and verifies that the panic message contains
+// expected substring(s).
+// Usage: assertPanics(t, func() { panic("something very bad") }, "bad", "very")
+func assertPanics(t *testing.T, fn func(), substrings ...string) {
+	t.Helper()
+
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("Expected panic, but none occurred")
+		} else {
+			panicStr := fmt.Sprint(r)
+			for _, substr := range substrings {
+				if !strings.Contains(panicStr, substr) {
+					t.Errorf("Panic message %q missing expected substring %q", panicStr, substr)
+				}
+			}
+		}
+	}()
+
+	fn()
+}
+
+// assertDoesNotPanic checks that fn() does not panic.
+// Usage: assertDoesNotPanic(t, func() { doSomethingSafe() })
+func assertDoesNotPanic(t *testing.T, fn func()) {
+	t.Helper()
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("Unexpected panic: %v", r)
+		}
+	}()
+
+	fn()
 }
 
 // Helper function to generate random strings for filenames

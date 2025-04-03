@@ -3,7 +3,9 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
 	"path/filepath"
+	"runtime/debug"
 
 	"github.com/joho/godotenv"
 )
@@ -20,6 +22,15 @@ func main() {
 	}
 
 	logger := GetLogger(cfg.debug)
+
+	defer func() {
+		if r := recover(); r != nil {
+			stack := debug.Stack()
+			logger.Error.Printf("PANIC: %v\n%s", r, stack)
+			// TODO: Send a message with the panic info
+			os.Exit(1)
+		}
+	}()
 
 	// TODO: Check that the workdir exists, and if not, create it
 

@@ -19,87 +19,6 @@ type CFCreds struct {
 	Endpoint  string
 }
 
-type ServerConfig struct {
-	Log struct {
-		Loglevel string `json:"loglevel"`
-	} `json:"log"`
-	Inbounds []struct {
-		Protocol string `json:"protocol"`
-		Tag      string `json:"tag"`
-		Port     int    `json:"port"`
-		Listen   string `json:"listen,omitempty"`
-		Sniffing struct {
-			Enabled      bool     `json:"enabled"`
-			DestOverride []string `json:"destOverride"`
-		} `json:"sniffing"`
-		Settings struct {
-			Clients *[]struct {
-				ID    string `json:"id"`
-				Email string `json:"email"`
-				Flow  string `json:"flow,omitempty"`
-			} `json:"clients,omitempty"`
-			Decryption string `json:"decryption,omitempty"`
-			Method     string `json:"method,omitempty"`
-			Password   string `json:"password,omitempty"`
-			Network    string `json:"network,omitempty"`
-		} `json:"settings"`
-		StreamSettings *struct {
-			Network         string `json:"network"`
-			Security        string `json:"security,omitempty"`
-			RealitySettings *struct {
-				Show         bool     `json:"show"`
-				Dest         string   `json:"dest"`
-				Xver         int      `json:"xver"`
-				ServerNames  []string `json:"serverNames"`
-				PrivateKey   string   `json:"privateKey"`
-				MinClientVer string   `json:"minClientVer"`
-				MaxClientVer string   `json:"maxClientVer"`
-				MaxTimeDiff  int      `json:"maxTimeDiff"`
-				ShortIds     []string `json:"shortIds"`
-			} `json:"realitySettings,omitempty"`
-			KcpSettings *struct {
-				Mtu              int  `json:"mtu"`
-				Tti              int  `json:"tti"`
-				UplinkCapacity   int  `json:"uplinkCapacity"`
-				DownlinkCapacity int  `json:"downlinkCapacity"`
-				Congestion       bool `json:"congestion"`
-				ReadBufferSize   int  `json:"readBufferSize"`
-				WriteBufferSize  int  `json:"writeBufferSize"`
-				Header           struct {
-					Type string `json:"type"`
-				} `json:"header"`
-				Seed string `json:"seed"`
-			} `json:"kcpSettings,omitempty"`
-		} `json:"streamSettings,omitempty"`
-	} `json:"inbounds"`
-	Outbounds []struct {
-		Protocol string `json:"protocol"`
-		Tag      string `json:"tag"`
-		Settings *struct {
-			SecretKey string   `json:"secretKey"`
-			Address   []string `json:"address"`
-			Peers     []struct {
-				Endpoint  string `json:"endpoint"`
-				PublicKey string `json:"publicKey"`
-			} `json:"peers"`
-			Mtu            int    `json:"mtu"`
-			Reserved       []int  `json:"reserved"`
-			Workers        int    `json:"workers"`
-			DomainStrategy string `json:"domainStrategy"`
-		} `json:"settings,omitempty"`
-	} `json:"outbounds"`
-	Routing struct {
-		Rules []struct {
-			Type        string   `json:"type"`
-			OutboundTag string   `json:"outboundTag"`
-			Protocol    string   `json:"protocol,omitempty"`
-			Domain      []string `json:"domain,omitempty"`
-			IP          []string `json:"ip,omitempty"`
-		} `json:"rules"`
-		DomainStrategy string `json:"domainStrategy"`
-	} `json:"routing"`
-}
-
 // Parses the Cloudflare generator output. Tailored specifically for the output of
 // github.com/badafans/warp-reg.
 func parseCFCreds(output string) (CFCreds, error) {
@@ -175,20 +94,99 @@ func parseJSONFile[T any](jsonFilePath string, target *T, strict bool) error {
 	return nil
 }
 
+func getClientConfig(warpconfig *Warp, xrayServerConfig *ServerConfig) *ClientConfig {
+	var clientConfig ClientConfig
+
+	clientConfig.Log = xrayServerConfig.Log
+
+	clientInbound := ClientInbound{
+		Port:     warpconfig.xrayClientPort,
+		Protocol: "http",
+	}
+	clientConfig.Inbounds = append(clientConfig.Inbounds, clientInbound)
+
+	var cs ClientOutboundSettingsServer
+
+	// Loop through the server inbounds to find the one with the protocol that
+	// the warp verification client will use
+	// !!! For the moment this works only with shadowsocks !!!
+	var found bool
+	var routingRuleNetwork string
+	for _, inbound := range xrayServerConfig.Inbounds {
+		if inbound.Protocol == warpconfig.xrayProtocol {
+			found = true
+			cs.Port = inbound.Port
+			cs.Method = inbound.Settings.Method
+			cs.Password = inbound.Settings.Password
+			routingRuleNetwork = inbound.Settings.Network
+			break
+		}
+	}
+
+	if !found {
+		panic(fmt.Sprintf("protocol %s has not been found in the xray server config "+
+			"inbounds, which means that the server config was not properly validated "+
+			"after parsing. Check your code so that the protocol required for the "+
+			"client operation is supported.", warpconfig.xrayProtocol))
+	}
+
+	if cs.Method == "" || cs.Password == "" {
+		panic(fmt.Sprintf("protocol %s is present in the xray server config inbounds, "+
+			"but it still did not provide the required credentials for the client "+
+			"config, which means that the server config was not properly validated "+
+			"after parsing. Check your code so that the protocol required for the "+
+			"client operation is supported.", warpconfig.xrayProtocol))
+	}
+
+	clientOutbound := ClientOutbound{
+		Protocol: warpconfig.xrayProtocol,
+		Tag:      warpconfig.xrayProtocol,
+		Settings: ClientOutboundSettings{
+			Servers: []ClientOutboundSettingsServer{cs},
+		},
+	}
+	clientConfig.Outbounds = append(clientConfig.Outbounds, clientOutbound)
+
+	clientRoutingRule := ClientRoutingRule{
+		Type:        "field",
+		OutboundTag: warpconfig.xrayProtocol,
+		Network:     routingRuleNetwork,
+	}
+
+	clientRouting := ClientRouting{
+		Rules:          []ClientRoutingRule{clientRoutingRule},
+		DomainStrategy: "IPIfNonMatch",
+	}
+	clientConfig.Routing = clientRouting
+
+	return &clientConfig
+}
+
 func updateWarp(warpConfig Warp, debug bool) error {
 	logger := GetLogger(debug)
 
 	logger.Info.Println("Updating warp config...")
+
+	// Parse the existing xray config
 	logger.Info.Println("Parsing the existing xray config...")
-	xrayServerConfig := ServerConfig{}
+	var xrayServerConfig ServerConfig
 	if err := parseJSONFile(warpConfig.xrayServerConfigPath, &xrayServerConfig, true); err != nil {
 		return fmt.Errorf("error parsing xray server config at path %q: %w", warpConfig.xrayServerConfigPath, err)
 	}
 	logger.Info.Println("Successfully parsed xray server config...")
 
+	if err := xrayServerConfig.Validate(); err != nil {
+		return fmt.Errorf("the parsed xray server config failed validation: %w", err)
+	}
+
+	// Get the client config and verify that warp is active
+	clientConfig := getClientConfig(&warpConfig, &xrayServerConfig)
+
 	// TODO: Everything below is temporary for checking
 	// You actually need to download the CF cred generator, launch it, parse the output,
 	// write new values to the struct, and then write the struct to the json
+
+	fmt.Println(clientConfig)
 
 	for _, outbound := range xrayServerConfig.Outbounds {
 		if outbound.Protocol == "wireguard" {
