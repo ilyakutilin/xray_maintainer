@@ -1,9 +1,5 @@
 package main
 
-type ClientLog struct {
-	Loglevel string `json:"loglevel"`
-}
-
 type ClientInbound struct {
 	Port     int    `json:"port"`
 	Protocol string `json:"protocol"`
@@ -38,7 +34,7 @@ type ClientRouting struct {
 }
 
 type ClientConfig struct {
-	Log       ClientLog        `json:"log"`
+	Log       Log              `json:"log"`
 	Inbounds  []ClientInbound  `json:"inbounds"`
 	Outbounds []ClientOutbound `json:"outbounds"`
 	Routing   ClientRouting    `json:"routing"`

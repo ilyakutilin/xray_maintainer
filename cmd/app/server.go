@@ -2,7 +2,7 @@ package main
 
 import "fmt"
 
-type SrvLog struct {
+type Log struct {
 		Loglevel string `json:"loglevel"`
 }
 
@@ -105,7 +105,7 @@ type SrvRouting struct {
 }
 
 type ServerConfig struct {
-	Log       SrvLog        `json:"log"`
+	Log       Log           `json:"log"`
 	Inbounds  []SrvInbound  `json:"inbounds"`
 	Outbounds []SrvOutbound `json:"outbounds"`
 	Routing   SrvRouting    `json:"routing"`
