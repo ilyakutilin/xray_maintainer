@@ -1,33 +1,31 @@
 package main
 
-type ServerConfig struct {
-	Log struct {
+import "fmt"
+
+type SrvLog struct {
 		Loglevel string `json:"loglevel"`
-	} `json:"log"`
-	Inbounds []struct {
-		Protocol string `json:"protocol"`
-		Tag      string `json:"tag"`
-		Port     int    `json:"port"`
-		Listen   string `json:"listen,omitempty"`
-		Sniffing struct {
+}
+
+type SrvInbSniffing struct {
 			Enabled      bool     `json:"enabled"`
 			DestOverride []string `json:"destOverride"`
-		} `json:"sniffing"`
-		Settings struct {
-			Clients *[]struct {
+}
+
+type SrvInbSettingsClient struct {
 				ID    string `json:"id"`
 				Email string `json:"email"`
 				Flow  string `json:"flow,omitempty"`
-			} `json:"clients,omitempty"`
-			Decryption string `json:"decryption,omitempty"`
-			Method     string `json:"method,omitempty"`
-			Password   string `json:"password,omitempty"`
-			Network    string `json:"network,omitempty"`
-		} `json:"settings"`
-		StreamSettings *struct {
-			Network         string `json:"network"`
-			Security        string `json:"security,omitempty"`
-			RealitySettings *struct {
+}
+
+type SrvInbSettings struct {
+	Clients    *[]SrvInbSettingsClient `json:"clients,omitempty"`
+	Decryption string                  `json:"decryption,omitempty"`
+	Method     string                  `json:"method,omitempty"`
+	Password   string                  `json:"password,omitempty"`
+	Network    string                  `json:"network,omitempty"`
+}
+
+type SrvInbStreamRealitySettings struct {
 				Show         bool     `json:"show"`
 				Dest         string   `json:"dest"`
 				Xver         int      `json:"xver"`
@@ -37,48 +35,80 @@ type ServerConfig struct {
 				MaxClientVer string   `json:"maxClientVer"`
 				MaxTimeDiff  int      `json:"maxTimeDiff"`
 				ShortIds     []string `json:"shortIds"`
-			} `json:"realitySettings,omitempty"`
-			KcpSettings *struct {
-				Mtu              int  `json:"mtu"`
-				Tti              int  `json:"tti"`
-				UplinkCapacity   int  `json:"uplinkCapacity"`
-				DownlinkCapacity int  `json:"downlinkCapacity"`
-				Congestion       bool `json:"congestion"`
-				ReadBufferSize   int  `json:"readBufferSize"`
-				WriteBufferSize  int  `json:"writeBufferSize"`
-				Header           struct {
+}
+
+type SrvInbKCPHeader struct {
 					Type string `json:"type"`
-				} `json:"header"`
-				Seed string `json:"seed"`
-			} `json:"kcpSettings,omitempty"`
-		} `json:"streamSettings,omitempty"`
-	} `json:"inbounds"`
-	Outbounds []struct {
-		Protocol string `json:"protocol"`
-		Tag      string `json:"tag"`
-		Settings *struct {
-			SecretKey string   `json:"secretKey"`
-			Address   []string `json:"address"`
-			Peers     []struct {
+}
+
+type SrvInbStreamKCPSettings struct {
+	Mtu              int             `json:"mtu"`
+	Tti              int             `json:"tti"`
+	UplinkCapacity   int             `json:"uplinkCapacity"`
+	DownlinkCapacity int             `json:"downlinkCapacity"`
+	Congestion       bool            `json:"congestion"`
+	ReadBufferSize   int             `json:"readBufferSize"`
+	WriteBufferSize  int             `json:"writeBufferSize"`
+	Header           SrvInbKCPHeader `json:"header"`
+	Seed             string          `json:"seed"`
+}
+
+type SrvInbStreamSettings struct {
+	Network         string                       `json:"network"`
+	Security        string                       `json:"security,omitempty"`
+	RealitySettings *SrvInbStreamRealitySettings `json:"realitySettings,omitempty"`
+	KcpSettings     *SrvInbStreamKCPSettings     `json:"kcpSettings,omitempty"`
+}
+
+type SrvInbound struct {
+	Protocol       string                `json:"protocol"`
+	Tag            string                `json:"tag"`
+	Port           int                   `json:"port"`
+	Listen         string                `json:"listen,omitempty"`
+	Sniffing       SrvInbSniffing        `json:"sniffing"`
+	Settings       SrvInbSettings        `json:"settings"`
+	StreamSettings *SrvInbStreamSettings `json:"streamSettings,omitempty"`
+}
+
+type SrvOutboundSettingsPeer struct {
 				Endpoint  string `json:"endpoint"`
 				PublicKey string `json:"publicKey"`
-			} `json:"peers"`
-			Mtu            int    `json:"mtu"`
-			Reserved       []int  `json:"reserved"`
-			Workers        int    `json:"workers"`
-			DomainStrategy string `json:"domainStrategy"`
-		} `json:"settings,omitempty"`
-	} `json:"outbounds"`
-	Routing struct {
-		Rules []struct {
+}
+
+type SrvOutbSettings struct {
+	SecretKey      string                    `json:"secretKey"`
+	Address        []string                  `json:"address"`
+	Peers          []SrvOutboundSettingsPeer `json:"peers"`
+	Mtu            int                       `json:"mtu"`
+	Reserved       []int                     `json:"reserved"`
+	Workers        int                       `json:"workers"`
+	DomainStrategy string                    `json:"domainStrategy"`
+}
+
+type SrvOutbound struct {
+	Protocol string           `json:"protocol"`
+	Tag      string           `json:"tag"`
+	Settings *SrvOutbSettings `json:"settings,omitempty"`
+}
+
+type SrvRoutingRule struct {
 			Type        string   `json:"type"`
 			OutboundTag string   `json:"outboundTag"`
 			Protocol    string   `json:"protocol,omitempty"`
 			Domain      []string `json:"domain,omitempty"`
 			IP          []string `json:"ip,omitempty"`
-		} `json:"rules"`
-		DomainStrategy string `json:"domainStrategy"`
-	} `json:"routing"`
+}
+
+type SrvRouting struct {
+	Rules          []SrvRoutingRule `json:"rules"`
+	DomainStrategy string           `json:"domainStrategy"`
+}
+
+type ServerConfig struct {
+	Log       SrvLog        `json:"log"`
+	Inbounds  []SrvInbound  `json:"inbounds"`
+	Outbounds []SrvOutbound `json:"outbounds"`
+	Routing   SrvRouting    `json:"routing"`
 }
 
 func (c *ServerConfig) Validate() error {
