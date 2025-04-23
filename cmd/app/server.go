@@ -55,6 +55,25 @@ type SrvInbSettingsClient struct {
 	Flow  string `json:"flow,omitempty"`
 }
 
+func (s *SrvInbSettingsClient) Validate() error {
+	if !utils.IsValidUUID(s.ID) {
+		return fmt.Errorf("client id is '%s' which is not a valid UUID", s.ID)
+	}
+
+	if s.Email == "" {
+		return errors.New("client email shall not be empty")
+	}
+
+	switch s.Flow {
+	case "xtls-rprx-vision":
+	case "":
+	default:
+		return fmt.Errorf("client flow is '%s' while only xtls-rprx-vision is "+
+			"allowed (or none at all)", s.Flow)
+	}
+	return nil
+}
+
 type SrvInbSettings struct {
 	Clients    *[]SrvInbSettingsClient `json:"clients,omitempty"`
 	Decryption string                  `json:"decryption,omitempty"`

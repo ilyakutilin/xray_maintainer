@@ -140,6 +140,90 @@ func TestSrvInbSniffing_Validate(t *testing.T) {
 	}
 }
 
+func TestSrvInbSettingsClient_Validate(t *testing.T) {
+	validUUID := "123e4567-e89b-12d3-a456-426614174000" // Example valid UUID
+	invalidUUID := "not-a-uuid"
+
+	tests := []struct {
+		name        string
+		client      SrvInbSettingsClient
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name: "valid client with all fields",
+			client: SrvInbSettingsClient{
+				ID:    validUUID,
+				Email: "user@example.com",
+				Flow:  "xtls-rprx-vision",
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid client without flow",
+			client: SrvInbSettingsClient{
+				ID:    validUUID,
+				Email: "user@example.com",
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid UUID",
+			client: SrvInbSettingsClient{
+				ID:    invalidUUID,
+				Email: "user@example.com",
+			},
+			wantErr:     true,
+			errContains: "client id is '" + invalidUUID + "' which is not a valid UUID",
+		},
+		{
+			name: "empty email",
+			client: SrvInbSettingsClient{
+				ID:    validUUID,
+				Email: "",
+			},
+			wantErr:     true,
+			errContains: "client email shall not be empty",
+		},
+		{
+			name: "invalid flow",
+			client: SrvInbSettingsClient{
+				ID:    validUUID,
+				Email: "user@example.com",
+				Flow:  "invalid-flow",
+			},
+			wantErr:     true,
+			errContains: "client flow is 'invalid-flow' while only xtls-rprx-vision is allowed",
+		},
+		{
+			name: "multiple errors: invalid UUID and empty email",
+			client: SrvInbSettingsClient{
+				ID:    invalidUUID,
+				Email: "",
+			},
+			wantErr: true,
+			// We can't test for both errors since validation stops at first error
+			// This tests that at least one error is caught
+			errContains: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.client.Validate()
+			if tt.wantErr {
+				if tt.errContains != "" {
+					assertErrorContains(t, err, tt.errContains)
+				} else {
+					assertError(t, err)
+				}
+			} else {
+				assertNoError(t, err)
+			}
+		})
+	}
+}
+
 func TestSrvInbound_Validate(t *testing.T) {
 	tests := []struct {
 		name        string
