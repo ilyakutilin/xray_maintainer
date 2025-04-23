@@ -273,8 +273,39 @@ func (i *SrvInbound) Validate() error {
 		return fmt.Errorf("inbound.protocol cannot be empty")
 	default:
 		return fmt.Errorf(
-			"only vless and shadowsocks protocols are supported")
+			"inbound.protocol: only vless and shadowsocks protocols are supported")
 	}
+
+	if i.Tag == "" {
+		return errors.New("inbound.tag cannot be empty")
+	}
+
+	if i.Protocol == "vless" && i.Port != 443 {
+		return errors.New("inbound.port: vless protocol only supports port 443")
+	}
+
+	if i.Protocol == "vless" && !utils.IsExternalIPv4(i.Listen) {
+		return errors.New("inbound.listen shall be an external IPv4 address for the " +
+			"vless protocol")
+	}
+
+	err := i.Sniffing.Validate()
+	if err != nil {
+		return err
+	}
+
+	err = i.Settings.Validate()
+	if err != nil {
+		return err
+	}
+
+	if i.StreamSettings != nil {
+		err = i.StreamSettings.Validate()
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -350,5 +381,7 @@ func (c *ServerConfig) Validate() error {
 			errs.Append(err)
 		}
 	}
+
+	// TODO: Check tag uniqueness
 	return nil
 }

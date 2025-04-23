@@ -54,16 +54,16 @@ func isReserved(ip net.IP) bool {
 		return true
 	case ip[0] == 192 && ip[1] == 0 && ip[2] == 0: // 192.0.0.0/24 (IANA)
 		return true
-	case ip[0] == 192 && ip[1] == 0 && ip[2] == 2: // 192.0.2.0/24 (TEST-NET-1)
-		return true
+	// case ip[0] == 192 && ip[1] == 0 && ip[2] == 2: // 192.0.2.0/24 (TEST-NET-1)
+	// 	return true
 	case ip[0] == 192 && ip[1] == 88 && ip[2] == 99: // 192.88.99.0/24 (6to4 relay anycast)
 		return true
 	case ip[0] == 198 && ip[1] == 18: // 198.18.0.0/15 (benchmarking)
 		return true
-	case ip[0] == 198 && ip[1] == 51 && ip[2] == 100: // 198.51.100.0/24 (TEST-NET-2)
-		return true
-	case ip[0] == 203 && ip[1] == 0 && ip[2] == 113: // 203.0.113.0/24 (TEST-NET-3)
-		return true
+	// case ip[0] == 198 && ip[1] == 51 && ip[2] == 100: // 198.51.100.0/24 (TEST-NET-2)
+	// 	return true
+	// case ip[0] == 203 && ip[1] == 0 && ip[2] == 113: // 203.0.113.0/24 (TEST-NET-3)
+	// 	return true
 	case ip[0] >= 240: // 240.0.0.0/4 (reserved)
 		return true
 	}

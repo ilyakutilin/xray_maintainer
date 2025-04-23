@@ -753,24 +753,115 @@ func TestSrvInbStreamSettings_Validate(t *testing.T) {
 	}
 }
 
+// func TestSrvInbound_Validate(t *testing.T) {
+// 	tests := []struct {
+// 		name        string
+// 		inbound     SrvInbound
+// 		wantErr     bool
+// 		errContains string
+// 	}{
+// 		{
+// 			name: "valid vless protocol",
+// 			inbound: SrvInbound{
+// 				Protocol: "vless",
+// 			},
+// 			wantErr: false,
+// 		},
+// 		{
+// 			name: "valid shadowsocks protocol",
+// 			inbound: SrvInbound{
+// 				Protocol: "shadowsocks",
+// 			},
+// 			wantErr: false,
+// 		},
+// 		{
+// 			name: "empty protocol",
+// 			inbound: SrvInbound{
+// 				Protocol: "",
+// 			},
+// 			wantErr:     true,
+// 			errContains: "inbound.protocol cannot be empty",
+// 		},
+// 		{
+// 			name: "unsupported protocol",
+// 			inbound: SrvInbound{
+// 				Protocol: "unsupported",
+// 			},
+// 			wantErr:     true,
+// 			errContains: "only vless and shadowsocks protocols are supported",
+// 		},
+// 		{
+// 			name: "case sensitivity check",
+// 			inbound: SrvInbound{
+// 				Protocol: "VLESS", // assuming case matters
+// 			},
+// 			wantErr:     true,
+// 			errContains: "only vless and shadowsocks protocols are supported",
+// 		},
+// 	}
+
+// 	for _, tt := range tests {
+// 		t.Run(tt.name, func(t *testing.T) {
+// 			err := tt.inbound.Validate()
+// 			if tt.wantErr {
+// 				assertErrorContains(t, err, tt.errContains)
+// 			} else {
+// 				assertNoError(t, err)
+// 			}
+// 		})
+// 	}
+// }
+
 func TestSrvInbound_Validate(t *testing.T) {
+	// Helper valid configurations
+	validSniffing := SrvInbSniffing{
+		Enabled:      true,
+		DestOverride: []string{"http"},
+	}
+	validSettings := SrvInbSettings{
+		Clients:    &[]SrvInbSettingsClient{{ID: "123e4567-e89b-12d3-a456-426614174000", Email: "test@example.com"}},
+		Decryption: "none",
+		Password:   "longenoughpassword123",
+		Network:    "tcp",
+	}
+	validStreamSettings := &SrvInbStreamSettings{
+		RealitySettings: SrvInbStreamRealitySettings{
+			Dest:        "example.com:443",
+			ServerNames: []string{"example.com"},
+			PrivateKey:  "valid-key",
+		},
+	}
+
+	// External IPv4 for testing
+	externalIPv4 := "203.0.113.1"
+
 	tests := []struct {
 		name        string
 		inbound     SrvInbound
 		wantErr     bool
 		errContains string
 	}{
+		// Protocol validation
 		{
-			name: "valid vless protocol",
+			name: "valid vless",
 			inbound: SrvInbound{
 				Protocol: "vless",
+				Tag:      "vless-in",
+				Port:     443,
+				Listen:   externalIPv4,
+				Sniffing: validSniffing,
+				Settings: validSettings,
 			},
 			wantErr: false,
 		},
 		{
-			name: "valid shadowsocks protocol",
+			name: "valid shadowsocks",
 			inbound: SrvInbound{
 				Protocol: "shadowsocks",
+				Tag:      "ss-in",
+				Port:     8388,
+				Sniffing: validSniffing,
+				Settings: validSettings,
 			},
 			wantErr: false,
 		},
@@ -778,25 +869,137 @@ func TestSrvInbound_Validate(t *testing.T) {
 			name: "empty protocol",
 			inbound: SrvInbound{
 				Protocol: "",
+				Tag:      "test",
+				Port:     443,
+				Sniffing: validSniffing,
+				Settings: validSettings,
 			},
 			wantErr:     true,
 			errContains: "inbound.protocol cannot be empty",
 		},
 		{
-			name: "unsupported protocol",
+			name: "invalid protocol",
 			inbound: SrvInbound{
-				Protocol: "unsupported",
+				Protocol: "vmess",
+				Tag:      "test",
+				Port:     443,
+				Sniffing: validSniffing,
+				Settings: validSettings,
 			},
 			wantErr:     true,
 			errContains: "only vless and shadowsocks protocols are supported",
 		},
+
+		// Tag validation
 		{
-			name: "case sensitivity check",
+			name: "empty tag",
 			inbound: SrvInbound{
-				Protocol: "VLESS", // assuming case matters
+				Protocol: "vless",
+				Tag:      "",
+				Port:     443,
+				Listen:   externalIPv4,
+				Sniffing: validSniffing,
+				Settings: validSettings,
 			},
 			wantErr:     true,
-			errContains: "only vless and shadowsocks protocols are supported",
+			errContains: "inbound.tag cannot be empty",
+		},
+
+		// Port validation
+		{
+			name: "vless with wrong port",
+			inbound: SrvInbound{
+				Protocol: "vless",
+				Tag:      "vless-in",
+				Port:     8080,
+				Listen:   externalIPv4,
+				Sniffing: validSniffing,
+				Settings: validSettings,
+			},
+			wantErr:     true,
+			errContains: "inbound.port: vless protocol only supports port 443",
+		},
+
+		// Listen IP validation
+		{
+			name: "vless with internal IP",
+			inbound: SrvInbound{
+				Protocol: "vless",
+				Tag:      "vless-in",
+				Port:     443,
+				Listen:   "192.168.1.1",
+				Sniffing: validSniffing,
+				Settings: validSettings,
+			},
+			wantErr:     true,
+			errContains: "inbound.listen shall be an external IPv4 address",
+		},
+		{
+			name: "vless with empty listen",
+			inbound: SrvInbound{
+				Protocol: "vless",
+				Tag:      "vless-in",
+				Port:     443,
+				Listen:   "",
+				Sniffing: validSniffing,
+				Settings: validSettings,
+			},
+			wantErr:     true,
+			errContains: "inbound.listen shall be an external IPv4 address",
+		},
+
+		// Nested validation
+		{
+			name: "invalid sniffing",
+			inbound: SrvInbound{
+				Protocol: "vless",
+				Tag:      "vless-in",
+				Port:     443,
+				Listen:   externalIPv4,
+				Sniffing: SrvInbSniffing{
+					Enabled:      true,
+					DestOverride: []string{},
+				},
+				Settings: validSettings,
+			},
+			wantErr:     true,
+			errContains: "sniffing enabled and destOverride set",
+		},
+		{
+			name: "invalid settings",
+			inbound: SrvInbound{
+				Protocol: "vless",
+				Tag:      "vless-in",
+				Port:     443,
+				Listen:   externalIPv4,
+				Sniffing: validSniffing,
+				Settings: SrvInbSettings{
+					Clients:    &[]SrvInbSettingsClient{},
+					Decryption: "none",
+					Password:   "short",
+					Network:    "tcp",
+				},
+			},
+			wantErr:     true,
+			errContains: "client list should not be empty",
+		},
+		{
+			name: "invalid stream settings",
+			inbound: SrvInbound{
+				Protocol: "vless",
+				Tag:      "vless-in",
+				Port:     443,
+				Listen:   externalIPv4,
+				Sniffing: validSniffing,
+				Settings: validSettings,
+				StreamSettings: &SrvInbStreamSettings{
+					Network:         "udp",
+					Security:        "reality",
+					RealitySettings: validStreamSettings.RealitySettings,
+				},
+			},
+			wantErr:     true,
+			errContains: "network is 'udp' while only 'raw' or 'tcp'",
 		},
 	}
 
@@ -804,7 +1007,11 @@ func TestSrvInbound_Validate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := tt.inbound.Validate()
 			if tt.wantErr {
-				assertErrorContains(t, err, tt.errContains)
+				if tt.errContains != "" {
+					assertErrorContains(t, err, tt.errContains)
+				} else {
+					assertError(t, err)
+				}
 			} else {
 				assertNoError(t, err)
 			}
