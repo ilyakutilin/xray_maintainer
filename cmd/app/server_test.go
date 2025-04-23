@@ -640,6 +640,119 @@ func TestValidateServerNames(t *testing.T) {
 	}
 }
 
+func TestSrvInbStreamSettings_Validate(t *testing.T) {
+	// Setup valid reality settings to use in tests
+	validReality := SrvInbStreamRealitySettings{
+		Dest:        "example.com:443",
+		ServerNames: []string{"example.com"},
+		PrivateKey:  "valid-private-key",
+	}
+
+	// Setup invalid reality settings to test error propagation
+	invalidReality := SrvInbStreamRealitySettings{
+		Dest:        "invalid.example.com:443",
+		ServerNames: []string{""},
+		PrivateKey:  "",
+	}
+
+	tests := []struct {
+		name        string
+		settings    SrvInbStreamSettings
+		wantErr     bool
+		errContains string
+	}{
+		// Valid cases
+		{
+			name: "valid tcp with reality",
+			settings: SrvInbStreamSettings{
+				Network:         "tcp",
+				Security:        "reality",
+				RealitySettings: validReality,
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid raw with reality",
+			settings: SrvInbStreamSettings{
+				Network:         "raw",
+				Security:        "reality",
+				RealitySettings: validReality,
+			},
+			wantErr: false,
+		},
+
+		// Network validation tests
+		{
+			name: "empty network",
+			settings: SrvInbStreamSettings{
+				Network:         "",
+				Security:        "reality",
+				RealitySettings: validReality,
+			},
+			wantErr:     true,
+			errContains: "network cannot be empty",
+		},
+		{
+			name: "invalid network",
+			settings: SrvInbStreamSettings{
+				Network:         "udp",
+				Security:        "reality",
+				RealitySettings: validReality,
+			},
+			wantErr:     true,
+			errContains: "network is 'udp' while only 'raw' or 'tcp'",
+		},
+
+		// Security validation tests
+		{
+			name: "empty security",
+			settings: SrvInbStreamSettings{
+				Network:         "tcp",
+				Security:        "",
+				RealitySettings: validReality,
+			},
+			wantErr:     true,
+			errContains: "security cannot be empty",
+		},
+		{
+			name: "invalid security",
+			settings: SrvInbStreamSettings{
+				Network:         "tcp",
+				Security:        "tls",
+				RealitySettings: validReality,
+			},
+			wantErr:     true,
+			errContains: "only 'reality' security is supported",
+		},
+
+		// RealitySettings validation propagation
+		{
+			name: "invalid reality settings",
+			settings: SrvInbStreamSettings{
+				Network:         "tcp",
+				Security:        "reality",
+				RealitySettings: invalidReality,
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.settings.Validate()
+			if tt.wantErr {
+				if tt.errContains != "" {
+					assertErrorContains(t, err, tt.errContains)
+				} else {
+					assertError(t, err)
+				}
+			} else {
+				assertNoError(t, err)
+			}
+		})
+	}
+}
+
 func TestSrvInbound_Validate(t *testing.T) {
 	tests := []struct {
 		name        string

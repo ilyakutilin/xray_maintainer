@@ -236,6 +236,26 @@ type SrvInbStreamSettings struct {
 	RealitySettings SrvInbStreamRealitySettings `json:"realitySettings"`
 }
 
+func (s *SrvInbStreamSettings) Validate() error {
+	switch s.Network {
+	case "raw", "tcp":
+	case "":
+		return errors.New("network cannot be empty")
+	default:
+		return fmt.Errorf("network is '%s' while only 'raw' or 'tcp' (which are "+
+			"interchangeable) are supported", s.Network)
+	}
+
+	switch s.Security {
+	case "reality":
+		return s.RealitySettings.Validate()
+	case "":
+		return errors.New("security cannot be empty")
+	default:
+		return errors.New("only 'reality' security is supported")
+	}
+}
+
 type SrvInbound struct {
 	Protocol       string                `json:"protocol"`
 	Tag            string                `json:"tag"`
