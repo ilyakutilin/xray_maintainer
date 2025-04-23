@@ -139,27 +139,10 @@ type SrvInbStreamRealitySettings struct {
 	ShortIds     []string `json:"shortIds"`
 }
 
-type SrvInbKCPHeader struct {
-	Type string `json:"type"`
-}
-
-type SrvInbStreamKCPSettings struct {
-	Mtu              int             `json:"mtu"`
-	Tti              int             `json:"tti"`
-	UplinkCapacity   int             `json:"uplinkCapacity"`
-	DownlinkCapacity int             `json:"downlinkCapacity"`
-	Congestion       bool            `json:"congestion"`
-	ReadBufferSize   int             `json:"readBufferSize"`
-	WriteBufferSize  int             `json:"writeBufferSize"`
-	Header           SrvInbKCPHeader `json:"header"`
-	Seed             string          `json:"seed"`
-}
-
 type SrvInbStreamSettings struct {
-	Network         string                       `json:"network"`
-	Security        string                       `json:"security,omitempty"`
-	RealitySettings *SrvInbStreamRealitySettings `json:"realitySettings,omitempty"`
-	KcpSettings     *SrvInbStreamKCPSettings     `json:"kcpSettings,omitempty"`
+	Network         string                      `json:"network"`
+	Security        string                      `json:"security,omitempty"`
+	RealitySettings SrvInbStreamRealitySettings `json:"realitySettings"`
 }
 
 type SrvInbound struct {
