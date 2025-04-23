@@ -399,6 +399,247 @@ func TestSrvInbSettings_Validate(t *testing.T) {
 	}
 }
 
+func TestSrvInbStreamRealitySettings(t *testing.T) {
+	// Helper valid domains
+	validDomain := "example.com:443"
+	validDomain2 := "sub.example.com:443"
+	invalidDomain := "example..com:443"
+	invalidPort := "example.com:80"
+	noPort := "example.com"
+	ipDest := "1.1.1.1:443"
+
+	tests := []struct {
+		name        string
+		settings    SrvInbStreamRealitySettings
+		wantErr     bool
+		errContains string
+	}{
+		// IsDestValid tests
+		{
+			name: "valid domain dest",
+			settings: SrvInbStreamRealitySettings{
+				Dest:        validDomain,
+				ServerNames: []string{"example.com"},
+				PrivateKey:  "test-key",
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid subdomain dest",
+			settings: SrvInbStreamRealitySettings{
+				Dest:        validDomain2,
+				ServerNames: []string{"sub.example.com"},
+				PrivateKey:  "test-key",
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid 1.1.1.1 dest",
+			settings: SrvInbStreamRealitySettings{
+				Dest:        ipDest,
+				ServerNames: []string{""},
+				PrivateKey:  "test-key",
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid domain format",
+			settings: SrvInbStreamRealitySettings{
+				Dest:        invalidDomain,
+				ServerNames: []string{"example..com"},
+				PrivateKey:  "test-key",
+			},
+			wantErr:     true,
+			errContains: "which is not a valid reality dest",
+		},
+		{
+			name: "invalid port",
+			settings: SrvInbStreamRealitySettings{
+				Dest:        invalidPort,
+				ServerNames: []string{"example.com"},
+				PrivateKey:  "test-key",
+			},
+			wantErr:     true,
+			errContains: "which is not a valid reality dest",
+		},
+		{
+			name: "missing port",
+			settings: SrvInbStreamRealitySettings{
+				Dest:        noPort,
+				ServerNames: []string{"example.com"},
+				PrivateKey:  "test-key",
+			},
+			wantErr:     true,
+			errContains: "which is not a valid reality dest",
+		},
+
+		// ValidateServerNames tests
+		{
+			name: "empty serverNames",
+			settings: SrvInbStreamRealitySettings{
+				Dest:        validDomain,
+				ServerNames: []string{},
+				PrivateKey:  "test-key",
+			},
+			wantErr:     true,
+			errContains: "serverNames must have exactly one element",
+		},
+		{
+			name: "multiple serverNames",
+			settings: SrvInbStreamRealitySettings{
+				Dest:        validDomain,
+				ServerNames: []string{"example.com", "extra.com"},
+				PrivateKey:  "test-key",
+			},
+			wantErr:     true,
+			errContains: "serverNames must have exactly one element",
+		},
+		{
+			name: "mismatched serverName",
+			settings: SrvInbStreamRealitySettings{
+				Dest:        validDomain,
+				ServerNames: []string{"wrong.com"},
+				PrivateKey:  "test-key",
+			},
+			wantErr:     true,
+			errContains: "serverName 'wrong.com' does not match the domain",
+		},
+		{
+			name: "non-empty serverName with 1.1.1.1",
+			settings: SrvInbStreamRealitySettings{
+				Dest:        ipDest,
+				ServerNames: []string{"example.com"},
+				PrivateKey:  "test-key",
+			},
+			wantErr:     true,
+			errContains: "when the dest is '1.1.1.1:443', serverName must be empty",
+		},
+		{
+			name: "serverName with wildcard",
+			settings: SrvInbStreamRealitySettings{
+				Dest:        validDomain,
+				ServerNames: []string{"*.example.com"},
+				PrivateKey:  "test-key",
+			},
+			wantErr:     true,
+			errContains: "wildcards are not suppported in serverNames",
+		},
+
+		// Other field validations
+		{
+			name: "invalid xver",
+			settings: SrvInbStreamRealitySettings{
+				Dest:        validDomain,
+				ServerNames: []string{"example.com"},
+				PrivateKey:  "test-key",
+				Xver:        1,
+			},
+			wantErr:     true,
+			errContains: "xver is '1' while only 0 is supported",
+		},
+		{
+			name: "empty privateKey",
+			settings: SrvInbStreamRealitySettings{
+				Dest:        validDomain,
+				ServerNames: []string{"example.com"},
+				PrivateKey:  "",
+			},
+			wantErr:     true,
+			errContains: "privateKey cannot be empty",
+		},
+		{
+			name: "non-empty shortIds",
+			settings: SrvInbStreamRealitySettings{
+				Dest:        validDomain,
+				ServerNames: []string{"example.com"},
+				PrivateKey:  "test-key",
+				ShortIds:    []string{"123"},
+			},
+			wantErr:     true,
+			errContains: "shortIds must be empty",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.settings.Validate()
+			if tt.wantErr {
+				if tt.errContains != "" {
+					assertErrorContains(t, err, tt.errContains)
+				} else {
+					assertError(t, err)
+				}
+			} else {
+				assertNoError(t, err)
+			}
+		})
+	}
+}
+
+func TestIsDestValid(t *testing.T) {
+	tests := []struct {
+		name   string
+		dest   string
+		expect bool
+	}{
+		{"valid domain", "example.com:443", true},
+		{"valid subdomain", "sub.example.com:443", true},
+		{"valid ip", "1.1.1.1:443", true},
+		{"invalid domain", "example..com:443", false},
+		{"wrong port", "example.com:80", false},
+		{"missing port", "example.com", false},
+		{"empty string", "", false},
+		{"invalid format", "not a domain", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := SrvInbStreamRealitySettings{Dest: tt.dest}
+			result := s.IsDestValid()
+			assertCorrectBool(t, tt.expect, result)
+		})
+	}
+}
+
+func TestValidateServerNames(t *testing.T) {
+	tests := []struct {
+		name        string
+		settings    SrvInbStreamRealitySettings
+		wantErr     bool
+		errContains string
+	}{
+		{"valid domain match", SrvInbStreamRealitySettings{
+			Dest: "example.com:443", ServerNames: []string{"example.com"},
+		}, false, ""},
+		{"valid ip empty", SrvInbStreamRealitySettings{
+			Dest: "1.1.1.1:443", ServerNames: []string{""},
+		}, false, ""},
+		{"empty serverNames", SrvInbStreamRealitySettings{
+			Dest: "example.com:443", ServerNames: []string{},
+		}, true, "exactly one element"},
+		{"multiple serverNames", SrvInbStreamRealitySettings{
+			Dest: "example.com:443", ServerNames: []string{"a", "b"},
+		}, true, "exactly one element"},
+		{"mismatched domain", SrvInbStreamRealitySettings{
+			Dest: "example.com:443", ServerNames: []string{"wrong.com"},
+		}, true, "does not match"},
+		{"ip with non-empty", SrvInbStreamRealitySettings{
+			Dest: "1.1.1.1:443", ServerNames: []string{"example.com"},
+		}, true, "must be empty"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.settings.ValidateServerNames()
+			if tt.wantErr {
+				assertErrorContains(t, err, tt.errContains)
+			} else {
+				assertNoError(t, err)
+			}
+		})
+	}
+}
+
 func TestSrvInbound_Validate(t *testing.T) {
 	tests := []struct {
 		name        string

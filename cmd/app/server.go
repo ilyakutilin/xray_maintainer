@@ -3,6 +3,8 @@ package main
 import (
 	"errors"
 	"fmt"
+	"regexp"
+	"strings"
 
 	"github.com/ilyakutilin/xray_maintainer/utils"
 )
@@ -137,6 +139,95 @@ type SrvInbStreamRealitySettings struct {
 	MaxClientVer string   `json:"maxClientVer"`
 	MaxTimeDiff  int      `json:"maxTimeDiff"`
 	ShortIds     []string `json:"shortIds"`
+}
+
+func (s *SrvInbStreamRealitySettings) IsDestValid() bool {
+	// A special case: Reality dest can be set to '1.1.1.1:443'
+	if s.Dest == "1.1.1.1:443" {
+		return true
+	}
+
+	// Split the string into domain and port parts
+	parts := strings.Split(s.Dest, ":")
+	if len(parts) != 2 {
+		return false
+	}
+
+	// Check the port is exactly "443"
+	if parts[1] != "443" {
+		return false
+	}
+
+	// Validate the domain part
+	domain := parts[0]
+	if domain == "" {
+		return false
+	}
+
+	// Regular expression for domain validation
+	// This allows:
+	// - letters a-z (case insensitive)
+	// - digits 0-9
+	// - hyphens (but not at start or end)
+	// - dots (but not at start or end)
+	// - at least one dot (for subdomains)
+	domainRegex := `^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$`
+	matched, err := regexp.MatchString(domainRegex, domain)
+	if err != nil {
+		return false
+	}
+
+	return matched
+}
+
+func (s *SrvInbStreamRealitySettings) ValidateServerNames() error {
+	if len(s.ServerNames) != 1 {
+		return errors.New("serverNames must have exactly one element")
+	}
+
+	if strings.Contains(s.ServerNames[0], "*") {
+		return errors.New("wildcards are not suppported in serverNames")
+	}
+
+	domain := strings.Split(s.Dest, ":")[0]
+	if domain == "1.1.1.1" {
+		if s.ServerNames[0] != "" {
+			return errors.New("when the dest is '1.1.1.1:443', serverName must be empty")
+		}
+	} else {
+		if s.ServerNames[0] != domain {
+			return fmt.Errorf("serverName '%s' does not match the domain in the dest "+
+				"'%s'", s.ServerNames[0], s.Dest)
+		}
+	}
+	return nil
+}
+
+func (s *SrvInbStreamRealitySettings) Validate() error {
+	if !s.IsDestValid() {
+		return fmt.Errorf("dest is '%s' which is not a valid reality dest: "+
+			"it should be either '1.1.1.1:443' or a valid domain with port 443, e.g.: "+
+			"'example.com:443'", s.Dest)
+	}
+
+	if s.Xver != 0 {
+		return fmt.Errorf("xver is '%d' while only 0 is supported", s.Xver)
+	}
+
+	err := s.ValidateServerNames()
+	if err != nil {
+		return err
+	}
+
+	if s.PrivateKey == "" {
+		return errors.New("privateKey cannot be empty")
+	}
+
+	if len(s.ShortIds) != 0 && s.ShortIds[0] != "" {
+		return errors.New("shortIds must be empty")
+	}
+
+	return nil
 }
 
 type SrvInbStreamSettings struct {
