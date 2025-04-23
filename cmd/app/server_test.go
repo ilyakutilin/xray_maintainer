@@ -224,6 +224,181 @@ func TestSrvInbSettingsClient_Validate(t *testing.T) {
 	}
 }
 
+func TestSrvInbSettings_Validate(t *testing.T) {
+	// Create a minimal valid client slice to use in valid cases
+	validClients := []SrvInbSettingsClient{{
+		ID:    "123e4567-e89b-12d3-a456-426614174000",
+		Email: "valid@example.com",
+	}}
+
+	tests := []struct {
+		name        string
+		settings    SrvInbSettings
+		wantErr     bool
+		errContains string
+	}{
+		// Clients validation
+		{
+			name:        "nil clients",
+			settings:    SrvInbSettings{Clients: nil},
+			wantErr:     true,
+			errContains: "client list should not be empty",
+		},
+		{
+			name: "empty clients slice",
+			settings: SrvInbSettings{
+				Clients:    &[]SrvInbSettingsClient{},
+				Decryption: "none",
+				Password:   "longenoughpassword123",
+				Network:    "tcp",
+			},
+			wantErr:     true,
+			errContains: "client list should not be empty",
+		},
+
+		// Decryption validation
+		{
+			name: "valid decryption 'none'",
+			settings: SrvInbSettings{
+				Clients:    &validClients,
+				Decryption: "none",
+				Password:   "longenoughpassword123",
+				Network:    "tcp",
+			},
+			wantErr: false,
+		},
+		{
+			name: "empty decryption",
+			settings: SrvInbSettings{
+				Clients:    &validClients,
+				Decryption: "",
+				Password:   "longenoughpassword123",
+				Network:    "tcp",
+			},
+			wantErr:     true,
+			errContains: "decryption cannot be left empty",
+		},
+		{
+			name: "invalid decryption",
+			settings: SrvInbSettings{
+				Clients:    &validClients,
+				Decryption: "invalid",
+				Password:   "longenoughpassword123",
+				Network:    "tcp",
+			},
+			wantErr:     true,
+			errContains: "decryption is 'invalid' while only 'none' is allowed",
+		},
+
+		// Method validation
+		{
+			name: "valid method 2022-blake3-aes-128-gcm",
+			settings: SrvInbSettings{
+				Clients:    &validClients,
+				Decryption: "none",
+				Method:     "2022-blake3-aes-128-gcm",
+				Password:   "longenoughpassword123",
+				Network:    "tcp",
+			},
+			wantErr: false,
+		},
+		{
+			name: "empty method (valid)",
+			settings: SrvInbSettings{
+				Clients:    &validClients,
+				Decryption: "none",
+				Password:   "longenoughpassword123",
+				Network:    "tcp",
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid method",
+			settings: SrvInbSettings{
+				Clients:    &validClients,
+				Decryption: "none",
+				Method:     "invalid-method",
+				Password:   "longenoughpassword123",
+				Network:    "tcp",
+			},
+			wantErr:     true,
+			errContains: "method is 'invalid-method' while only the following options are allowed",
+		},
+
+		// Password validation
+		{
+			name: "password too short",
+			settings: SrvInbSettings{
+				Clients:    &validClients,
+				Decryption: "none",
+				Password:   "short",
+				Network:    "tcp",
+			},
+			wantErr:     true,
+			errContains: "password is too short",
+		},
+
+		// Network validation
+		{
+			name: "valid network tcp",
+			settings: SrvInbSettings{
+				Clients:    &validClients,
+				Decryption: "none",
+				Password:   "longenoughpassword123",
+				Network:    "tcp",
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid network tcp,udp",
+			settings: SrvInbSettings{
+				Clients:    &validClients,
+				Decryption: "none",
+				Password:   "longenoughpassword123",
+				Network:    "tcp,udp",
+			},
+			wantErr: false,
+		},
+		{
+			name: "empty network (invalid)",
+			settings: SrvInbSettings{
+				Clients:    &validClients,
+				Decryption: "none",
+				Password:   "longenoughpassword123",
+				Network:    "",
+			},
+			wantErr:     true,
+			errContains: "network cannot be left empty",
+		},
+		{
+			name: "invalid network",
+			settings: SrvInbSettings{
+				Clients:    &validClients,
+				Decryption: "none",
+				Password:   "longenoughpassword123",
+				Network:    "invalid",
+			},
+			wantErr:     true,
+			errContains: "network is 'invalid' while only the following options are allowed",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.settings.Validate()
+			if tt.wantErr {
+				if tt.errContains != "" {
+					assertErrorContains(t, err, tt.errContains)
+				} else {
+					assertError(t, err)
+				}
+			} else {
+				assertNoError(t, err)
+			}
+		})
+	}
+}
+
 func TestSrvInbound_Validate(t *testing.T) {
 	tests := []struct {
 		name        string

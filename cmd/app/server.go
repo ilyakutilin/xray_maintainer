@@ -82,6 +82,51 @@ type SrvInbSettings struct {
 	Network    string                  `json:"network,omitempty"`
 }
 
+func (s *SrvInbSettings) Validate() error {
+	if s.Clients == nil || len(*s.Clients) == 0 {
+		return errors.New("client list should not be empty")
+	}
+
+	for _, client := range *s.Clients {
+		if err := client.Validate(); err != nil {
+			return err
+		}
+	}
+
+	switch s.Decryption {
+	case "none":
+	case "":
+		return errors.New("decryption cannot be left empty")
+	default:
+		return fmt.Errorf(
+			"decryption is '%s' while only 'none' is allowed", s.Decryption)
+	}
+
+	switch s.Method {
+	case "2022-blake3-aes-128-gcm", "2022-blake3-aes-256-gcm", "2022-blake3-chacha20-poly1305":
+	case "":
+	default:
+		return fmt.Errorf("method is '%s' while only the following options are "+
+			"allowed: '2022-blake3-aes-128-gcm' | '2022-blake3-aes-256-gcm' | "+
+			"'2022-blake3-chacha20-poly1305'", s.Method)
+	}
+
+	if len(s.Password) < 16 {
+		return errors.New("password is too short")
+	}
+
+	switch s.Network {
+	case "tcp", "udp", "tcp,udp":
+	case "":
+		return errors.New("network cannot be left empty")
+	default:
+		return fmt.Errorf("network is '%s' while only the following options are "+
+			"allowed: 'tcp' | 'udp' | 'tcp,udp'", s.Network)
+	}
+
+	return nil
+}
+
 type SrvInbStreamRealitySettings struct {
 	Show         bool     `json:"show"`
 	Dest         string   `json:"dest"`
