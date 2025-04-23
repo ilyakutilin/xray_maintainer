@@ -11,6 +11,19 @@ type Log struct {
 		Loglevel string `json:"loglevel"`
 }
 
+func (l *Log) Validate() error {
+	switch l.Loglevel {
+	case "debug", "info", "warning", "error", "none": // Acceptable
+	case "":
+		return fmt.Errorf(
+			"xray server config must have the logger block with loglevel set")
+	default:
+		return fmt.Errorf(`xray server config must have the logger block with ` +
+			`loglevel set; allowed values: "debug", "info", "warning", "error", "none"`)
+	}
+	return nil
+}
+
 type SrvInbSniffing struct {
 			Enabled      bool     `json:"enabled"`
 			DestOverride []string `json:"destOverride"`
@@ -75,6 +88,18 @@ type SrvInbound struct {
 	StreamSettings *SrvInbStreamSettings `json:"streamSettings,omitempty"`
 }
 
+func (i *SrvInbound) Validate() error {
+	switch i.Protocol {
+	case "vless", "shadowsocks": // Acceptable
+	case "":
+		return fmt.Errorf("inbound.protocol cannot be empty")
+	default:
+		return fmt.Errorf(
+			"only vless and shadowsocks protocols are supported")
+	}
+	return nil
+}
+
 type SrvOutboundSettingsPeer struct {
 				Endpoint  string `json:"endpoint"`
 				PublicKey string `json:"publicKey"`
@@ -116,20 +141,6 @@ type ServerConfig struct {
 	Routing   SrvRouting    `json:"routing"`
 }
 
-func (l *Log) Validate() error {
-	switch l.Loglevel {
-	case "debug", "info", "warning", "error", "none": // Acceptable
-	case "":
-		return fmt.Errorf(
-			"xray server config must have the logger block with loglevel set")
-	default:
-		return fmt.Errorf(`xray server config must have the logger block with ` +
-			`loglevel set; allowed values: "debug", "info", "warning", "error", "none"`)
-	}
-	return nil
-}
-
-
 func (c *ServerConfig) Validate() error {
 	var errs utils.Errors
 
@@ -138,5 +149,28 @@ func (c *ServerConfig) Validate() error {
 		errs.Append(err)
 	}
 
+	if len(c.Inbounds) == 0 {
+		errs.Append(errors.New("xray server config must have at least one inbound"))
+	}
+
+	shadowsocksExists := false
+	for _, inbound := range c.Inbounds {
+		if inbound.Protocol == "shadowsocks" {
+			shadowsocksExists = true
+			break
+		}
+	}
+	if !shadowsocksExists {
+		errs.Append(errors.New("xray server config must have at least one inbound " +
+			"with shadowsocks protocol since it will be required for the warp " +
+			"verification client"))
+	}
+
+	for _, inbound := range c.Inbounds {
+		err = inbound.Validate()
+		if err != nil {
+			errs.Append(err)
+		}
+	}
 	return nil
 }

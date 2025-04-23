@@ -39,6 +39,16 @@ func assertError(t testing.TB, err error) {
 	}
 }
 
+func assertErrorContains(t testing.TB, err error, substr string) {
+	t.Helper()
+	if err == nil {
+		t.Errorf("Wanted an error but didn't get one")
+	}
+	if !strings.Contains(err.Error(), substr) {
+		t.Errorf("Expected error to contain %q, got %q", substr, err.Error())
+	}
+}
+
 func assertNoError(t testing.TB, err error) {
 	t.Helper()
 	if err != nil {
