@@ -1,6 +1,11 @@
 package main
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+
+	"github.com/ilyakutilin/xray_maintainer/utils"
+)
 
 type Log struct {
 		Loglevel string `json:"loglevel"`
@@ -111,7 +116,27 @@ type ServerConfig struct {
 	Routing   SrvRouting    `json:"routing"`
 }
 
+func (l *Log) Validate() error {
+	switch l.Loglevel {
+	case "debug", "info", "warning", "error", "none": // Acceptable
+	case "":
+		return fmt.Errorf(
+			"xray server config must have the logger block with loglevel set")
+	default:
+		return fmt.Errorf(`xray server config must have the logger block with ` +
+			`loglevel set; allowed values: "debug", "info", "warning", "error", "none"`)
+	}
+	return nil
+}
+
+
 func (c *ServerConfig) Validate() error {
-	// TODO: Implement
+	var errs utils.Errors
+
+	err := c.Log.Validate()
+	if err != nil {
+		errs.Append(err)
+	}
+
 	return nil
 }
