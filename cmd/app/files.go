@@ -68,10 +68,10 @@ func expandPath(path string) (string, error) {
 	return filepath.Clean(absPath), nil
 }
 
-// Makes a file executable
-func makeExecutable(filePath string) error {
-	return os.Chmod(filePath, 0755)
-}
+// // Makes a file executable
+// func makeExecutable(filePath string) error {
+// 	return os.Chmod(filePath, 0755)
+// }
 
 func getStoredReleaseTag(fileName string, versionFilePath string) (string, error) {
 	data, err := os.ReadFile(versionFilePath)
