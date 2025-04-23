@@ -8,7 +8,7 @@ import (
 )
 
 type Log struct {
-		Loglevel string `json:"loglevel"`
+	Loglevel string `json:"loglevel"`
 }
 
 func (l *Log) Validate() error {
@@ -25,14 +25,34 @@ func (l *Log) Validate() error {
 }
 
 type SrvInbSniffing struct {
-			Enabled      bool     `json:"enabled"`
-			DestOverride []string `json:"destOverride"`
+	Enabled      bool     `json:"enabled"`
+	DestOverride []string `json:"destOverride"`
+}
+
+func (s *SrvInbSniffing) Validate() error {
+	if s.Enabled && len(s.DestOverride) == 0 {
+		return errors.New(
+			"xray server config must have the inbound block with sniffing " +
+				"enabled and destOverride set")
+	}
+
+	for _, dest := range s.DestOverride {
+		switch dest {
+		case "http", "tls", "quic":
+		default:
+			return fmt.Errorf(`xray server config must have the inbound block ` +
+				`with sniffing enabled and destOverride set; allowed values: ` +
+				`"http", "tls", "quic"`)
+		}
+	}
+
+	return nil
 }
 
 type SrvInbSettingsClient struct {
-				ID    string `json:"id"`
-				Email string `json:"email"`
-				Flow  string `json:"flow,omitempty"`
+	ID    string `json:"id"`
+	Email string `json:"email"`
+	Flow  string `json:"flow,omitempty"`
 }
 
 type SrvInbSettings struct {
@@ -44,19 +64,19 @@ type SrvInbSettings struct {
 }
 
 type SrvInbStreamRealitySettings struct {
-				Show         bool     `json:"show"`
-				Dest         string   `json:"dest"`
-				Xver         int      `json:"xver"`
-				ServerNames  []string `json:"serverNames"`
-				PrivateKey   string   `json:"privateKey"`
-				MinClientVer string   `json:"minClientVer"`
-				MaxClientVer string   `json:"maxClientVer"`
-				MaxTimeDiff  int      `json:"maxTimeDiff"`
-				ShortIds     []string `json:"shortIds"`
+	Show         bool     `json:"show"`
+	Dest         string   `json:"dest"`
+	Xver         int      `json:"xver"`
+	ServerNames  []string `json:"serverNames"`
+	PrivateKey   string   `json:"privateKey"`
+	MinClientVer string   `json:"minClientVer"`
+	MaxClientVer string   `json:"maxClientVer"`
+	MaxTimeDiff  int      `json:"maxTimeDiff"`
+	ShortIds     []string `json:"shortIds"`
 }
 
 type SrvInbKCPHeader struct {
-					Type string `json:"type"`
+	Type string `json:"type"`
 }
 
 type SrvInbStreamKCPSettings struct {
@@ -101,8 +121,8 @@ func (i *SrvInbound) Validate() error {
 }
 
 type SrvOutboundSettingsPeer struct {
-				Endpoint  string `json:"endpoint"`
-				PublicKey string `json:"publicKey"`
+	Endpoint  string `json:"endpoint"`
+	PublicKey string `json:"publicKey"`
 }
 
 type SrvOutbSettings struct {
@@ -122,11 +142,11 @@ type SrvOutbound struct {
 }
 
 type SrvRoutingRule struct {
-			Type        string   `json:"type"`
-			OutboundTag string   `json:"outboundTag"`
-			Protocol    string   `json:"protocol,omitempty"`
-			Domain      []string `json:"domain,omitempty"`
-			IP          []string `json:"ip,omitempty"`
+	Type        string   `json:"type"`
+	OutboundTag string   `json:"outboundTag"`
+	Protocol    string   `json:"protocol,omitempty"`
+	Domain      []string `json:"domain,omitempty"`
+	IP          []string `json:"ip,omitempty"`
 }
 
 type SrvRouting struct {

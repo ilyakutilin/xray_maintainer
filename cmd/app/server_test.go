@@ -64,6 +64,82 @@ func TestLog_Validate(t *testing.T) {
 	}
 }
 
+func TestSrvInbSniffing_Validate(t *testing.T) {
+	tests := []struct {
+		name        string
+		sniffing    SrvInbSniffing
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name: "valid with http destOverride",
+			sniffing: SrvInbSniffing{
+				Enabled:      true,
+				DestOverride: []string{"http"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid with multiple destOverride",
+			sniffing: SrvInbSniffing{
+				Enabled:      true,
+				DestOverride: []string{"http", "tls", "quic"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "disabled with empty destOverride",
+			sniffing: SrvInbSniffing{
+				Enabled:      false,
+				DestOverride: []string{},
+			},
+			wantErr: false,
+		},
+		{
+			name: "enabled but empty destOverride",
+			sniffing: SrvInbSniffing{
+				Enabled:      true,
+				DestOverride: []string{},
+			},
+			wantErr:     true,
+			errContains: "must have the inbound block with sniffing enabled and destOverride set",
+		},
+		{
+			name: "invalid destOverride value",
+			sniffing: SrvInbSniffing{
+				Enabled:      true,
+				DestOverride: []string{"invalid"},
+			},
+			wantErr:     true,
+			errContains: `allowed values: "http", "tls", "quic"`,
+		},
+		{
+			name: "mixed valid and invalid destOverride",
+			sniffing: SrvInbSniffing{
+				Enabled:      true,
+				DestOverride: []string{"http", "invalid", "tls"},
+			},
+			wantErr:     true,
+			errContains: `allowed values: "http", "tls", "quic"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.sniffing.Validate()
+			if tt.wantErr {
+				if tt.errContains != "" {
+					assertErrorContains(t, err, tt.errContains)
+				} else {
+					assertError(t, err)
+				}
+			} else {
+				assertNoError(t, err)
+			}
+		})
+	}
+}
+
 func TestSrvInbound_Validate(t *testing.T) {
 	tests := []struct {
 		name        string
