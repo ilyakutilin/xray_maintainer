@@ -622,6 +622,60 @@ func (c *ServerConfig) Validate() error {
 		}
 	}
 
-	// TODO: Check tag uniqueness
+	wireguardExists := false
+	for _, outbound := range c.Outbounds {
+		if outbound.Protocol == "wireguard" {
+			wireguardExists = true
+			break
+		}
+	}
+	if !wireguardExists {
+		errs.Append(errors.New("xray server config must have at least one outbound " +
+			"with wireguard protocol"))
+	}
+
+	for _, outbound := range c.Outbounds {
+		err = outbound.Validate()
+		if err != nil {
+			errs.Append(err)
+		}
+	}
+
+	// Check tag correspondence
+	outboundTags := []string{}
+	for _, outbound := range c.Outbounds {
+		outboundTags = append(outboundTags, outbound.Tag)
+	}
+
+	ruleTags := []string{}
+	for _, rule := range c.Routing.Rules {
+		ruleTags = append(ruleTags, rule.OutboundTag)
+	}
+
+	missingOutboundTags := utils.FindMissingItems(outboundTags, ruleTags)
+
+	if len(missingOutboundTags) > 0 {
+		errs.Append(fmt.Errorf("the following tags in rules block have no matching "+
+			"outbound tags: %v", missingOutboundTags))
+	}
+
+	// Check tag uniqueness
+	tags := []string{}
+	for _, inbound := range c.Inbounds {
+		tags = append(tags, inbound.Tag)
+	}
+	for _, outbound := range c.Outbounds {
+		tags = append(tags, outbound.Tag)
+	}
+	duplicateTags := utils.FindDuplicates(tags)
+
+	if len(duplicateTags) > 0 {
+		errs.Append(fmt.Errorf("the following tags are not unique: %v", duplicateTags))
+	}
+
+	if len(errs) > 0 {
+		return errs
+	}
+
 	return nil
 }

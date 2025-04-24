@@ -1512,3 +1512,8 @@ func TestSrvRouting_Validate(t *testing.T) {
 		})
 	}
 }
+
+// TODO: Impement testing of the ServerConfig
+// func TestServerConfig_Validate(t *testing.T) {
+// 	// Implementation here
+// }
