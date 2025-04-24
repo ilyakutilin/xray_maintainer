@@ -1018,3 +1018,65 @@ func TestSrvInbound_Validate(t *testing.T) {
 		})
 	}
 }
+
+func TestSrvOutboundSettingsPeer_Validate(t *testing.T) {
+	validEndpoint := "engage.cloudflareclient.com:2408"
+	validPublicKey := "valid-public-key"
+
+	tests := []struct {
+		name        string
+		peer        SrvOutboundSettingsPeer
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name: "valid peer",
+			peer: SrvOutboundSettingsPeer{
+				Endpoint:  validEndpoint,
+				PublicKey: validPublicKey,
+			},
+			wantErr: false,
+		},
+		{
+			name: "empty endpoint",
+			peer: SrvOutboundSettingsPeer{
+				Endpoint:  "",
+				PublicKey: validPublicKey,
+			},
+			wantErr:     true,
+			errContains: "endpoint '' is not a valid endpoint",
+		},
+		{
+			name: "empty public key",
+			peer: SrvOutboundSettingsPeer{
+				Endpoint:  validEndpoint,
+				PublicKey: "",
+			},
+			wantErr:     true,
+			errContains: "publicKey cannot be empty",
+		},
+		{
+			name: "invalid endpoint (no port)",
+			peer: SrvOutboundSettingsPeer{
+				Endpoint:  "engage.cloudflareclient.com",
+				PublicKey: validPublicKey,
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.peer.Validate()
+			if tt.wantErr {
+				if tt.errContains != "" {
+					assertErrorContains(t, err, tt.errContains)
+				} else {
+					assertError(t, err)
+				}
+			} else {
+				assertNoError(t, err)
+			}
+		})
+	}
+}

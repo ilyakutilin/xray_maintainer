@@ -314,6 +314,18 @@ type SrvOutboundSettingsPeer struct {
 	PublicKey string `json:"publicKey"`
 }
 
+func (p *SrvOutboundSettingsPeer) Validate() error {
+	if p.PublicKey == "" {
+		return errors.New("publicKey cannot be empty")
+	}
+
+	if !utils.IsValidEndpoint(p.Endpoint) {
+		return fmt.Errorf("endpoint '%s' is not a valid endpoint", p.Endpoint)
+	}
+
+	return nil
+}
+
 type SrvOutbSettings struct {
 	SecretKey      string                    `json:"secretKey"`
 	Address        []string                  `json:"address"`
