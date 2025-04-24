@@ -1367,3 +1367,79 @@ func TestSrvOutbound_Validate(t *testing.T) {
 		})
 	}
 }
+
+func TestSrvRoutingRule_Validate(t *testing.T) {
+	tests := []struct {
+		name        string
+		rule        SrvRoutingRule
+		wantErr     bool
+		errContains string
+	}{
+		// Valid cases
+		{
+			name: "valid minimal field rule",
+			rule: SrvRoutingRule{
+				Type:        "field",
+				OutboundTag: "proxy-out",
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid rule with optional fields",
+			rule: SrvRoutingRule{
+				Type:        "field",
+				OutboundTag: "block-out",
+				Protocol:    "http",
+				Domain:      []string{"example.com"},
+				IP:          []string{"1.1.1.1"},
+			},
+			wantErr: false,
+		},
+
+		// Type validation
+		{
+			name: "empty type",
+			rule: SrvRoutingRule{
+				Type:        "",
+				OutboundTag: "test",
+			},
+			wantErr:     true,
+			errContains: "routing.rules.type cannot be empty",
+		},
+		{
+			name: "invalid type",
+			rule: SrvRoutingRule{
+				Type:        "invalid",
+				OutboundTag: "test",
+			},
+			wantErr:     true,
+			errContains: "invalid routing.rules.type 'invalid'",
+		},
+
+		// OutboundTag validation
+		{
+			name: "empty outboundTag",
+			rule: SrvRoutingRule{
+				Type:        "field",
+				OutboundTag: "",
+			},
+			wantErr:     true,
+			errContains: "routing.rules.outboundTag cannot be empty",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.rule.Validate()
+			if tt.wantErr {
+				if tt.errContains != "" {
+					assertErrorContains(t, err, tt.errContains)
+				} else {
+					assertError(t, err)
+				}
+			} else {
+				assertNoError(t, err)
+			}
+		})
+	}
+}

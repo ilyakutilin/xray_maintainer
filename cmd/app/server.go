@@ -427,6 +427,28 @@ type SrvRoutingRule struct {
 	IP          []string `json:"ip,omitempty"`
 }
 
+func (r *SrvRoutingRule) Validate() error {
+	switch r.Type {
+	case "field":
+	case "":
+		return errors.New("routing.rules.type cannot be empty")
+	default:
+		return fmt.Errorf("invalid routing.rules.type '%v': only 'field', "+
+			"is supported", r.Type)
+	}
+
+	if r.OutboundTag == "" {
+		return errors.New("routing.rules.outboundTag cannot be empty")
+	}
+
+	// There are specific rules that apply to the Protocol, IP and Domain fields
+	// that are set by the xray core devs. It would be way too verbose to validate
+	// each of them so please refer to their website for guidelines:
+	// https://xtls.github.io/en/config/routing.html#ruleobject
+
+	return nil
+}
+
 type SrvRouting struct {
 	Rules          []SrvRoutingRule `json:"rules"`
 	DomainStrategy string           `json:"domainStrategy"`
