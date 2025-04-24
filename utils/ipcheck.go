@@ -4,6 +4,20 @@ import (
 	"net"
 )
 
+func IsValidIPOrCIDR(ipStr string) bool {
+	// Try parsing as CIDR (IPv4 or IPv6 with range)
+	if _, _, err := net.ParseCIDR(ipStr); err == nil {
+		return true
+	}
+
+	// Try parsing as a plain IP (IPv4 or IPv6)
+	if ip := net.ParseIP(ipStr); ip != nil {
+		return true
+	}
+
+	return false
+}
+
 func IsExternalIPv4(ipStr string) bool {
 	// Parse the IP address
 	ip := net.ParseIP(ipStr)

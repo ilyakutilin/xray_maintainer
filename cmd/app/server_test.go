@@ -1080,3 +1080,167 @@ func TestSrvOutboundSettingsPeer_Validate(t *testing.T) {
 		})
 	}
 }
+
+func TestSrvOutbSettings_Validate(t *testing.T) {
+	validPeer := SrvOutboundSettingsPeer{"example.com:8080", "valid-public-key"}
+
+	tests := []struct {
+		name        string
+		settings    SrvOutbSettings
+		wantErr     bool
+		errContains string
+	}{
+		// Valid cases
+		{
+			name: "valid minimal configuration",
+			settings: SrvOutbSettings{
+				SecretKey:      "test-key",
+				Address:        []string{"192.168.1.1"},
+				Peers:          []SrvOutboundSettingsPeer{validPeer},
+				Mtu:            1280,
+				Reserved:       []int{1, 2, 3},
+				Workers:        1,
+				DomainStrategy: "ForceIPv4",
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid full configuration",
+			settings: SrvOutbSettings{
+				SecretKey:      "test-key",
+				Address:        []string{"192.168.1.1", "10.0.0.1"},
+				Peers:          []SrvOutboundSettingsPeer{validPeer, validPeer},
+				Mtu:            1500,
+				Reserved:       []int{0},
+				Workers:        4,
+				DomainStrategy: "ForceIP",
+			},
+			wantErr: false,
+		},
+
+		// SecretKey validation
+		{
+			name: "empty secretKey",
+			settings: SrvOutbSettings{
+				SecretKey:      "",
+				Address:        []string{"192.168.1.1"},
+				Peers:          []SrvOutboundSettingsPeer{validPeer},
+				Mtu:            1280,
+				Reserved:       []int{1},
+				Workers:        1,
+				DomainStrategy: "ForceIP",
+			},
+			wantErr:     true,
+			errContains: "outbound.settings.secretKey cannot be empty",
+		},
+
+		// Address validation
+		{
+			name: "empty address array",
+			settings: SrvOutbSettings{
+				SecretKey:      "test-key",
+				Address:        []string{},
+				Peers:          []SrvOutboundSettingsPeer{validPeer},
+				Mtu:            1280,
+				Reserved:       []int{1},
+				Workers:        1,
+				DomainStrategy: "ForceIP",
+			},
+			wantErr:     true,
+			errContains: "outbound.settings.address array cannot be empty",
+		},
+
+		// MTU validation
+		{
+			name: "MTU too small",
+			settings: SrvOutbSettings{
+				SecretKey:      "test-key",
+				Address:        []string{"192.168.1.1"},
+				Peers:          []SrvOutboundSettingsPeer{validPeer},
+				Mtu:            1279,
+				Reserved:       []int{1},
+				Workers:        1,
+				DomainStrategy: "ForceIP",
+			},
+			wantErr:     true,
+			errContains: "outbound.settings.mtu must be between 1280 and 1500",
+		},
+
+		// Reserved validation
+		{
+			name: "empty reserved array",
+			settings: SrvOutbSettings{
+				SecretKey:      "test-key",
+				Address:        []string{"192.168.1.1"},
+				Peers:          []SrvOutboundSettingsPeer{validPeer},
+				Mtu:            1280,
+				Reserved:       []int{},
+				Workers:        1,
+				DomainStrategy: "ForceIP",
+			},
+			wantErr:     true,
+			errContains: "outbound.settings.reserved array cannot be empty",
+		},
+
+		// Workers validation
+		{
+			name: "zero workers",
+			settings: SrvOutbSettings{
+				SecretKey:      "test-key",
+				Address:        []string{"192.168.1.1"},
+				Peers:          []SrvOutboundSettingsPeer{validPeer},
+				Mtu:            1280,
+				Reserved:       []int{1},
+				Workers:        0,
+				DomainStrategy: "ForceIP",
+			},
+			wantErr:     true,
+			errContains: "outbound.settings.workers must be at least 1",
+		},
+
+		// DomainStrategy validation
+		{
+			name: "empty domainStrategy",
+			settings: SrvOutbSettings{
+				SecretKey:      "test-key",
+				Address:        []string{"192.168.1.1"},
+				Peers:          []SrvOutboundSettingsPeer{validPeer},
+				Mtu:            1280,
+				Reserved:       []int{1},
+				Workers:        1,
+				DomainStrategy: "",
+			},
+			wantErr:     true,
+			errContains: "outbound.settings.domainStrategy cannot be empty",
+		},
+		{
+			name: "invalid domainStrategy",
+			settings: SrvOutbSettings{
+				SecretKey:      "test-key",
+				Address:        []string{"192.168.1.1"},
+				Peers:          []SrvOutboundSettingsPeer{validPeer},
+				Mtu:            1280,
+				Reserved:       []int{1},
+				Workers:        1,
+				DomainStrategy: "InvalidStrategy",
+			},
+			wantErr:     true,
+			errContains: "outbound.settings.domainStrategy is 'InvalidStrategy' while only",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.settings.Validate()
+			if tt.wantErr {
+				if tt.errContains != "" {
+					assertErrorContains(t, err, tt.errContains)
+				} else {
+					assertError(t, err)
+				}
+			} else {
+				assertNoError(t, err)
+			}
+		})
+	}
+}

@@ -336,6 +336,54 @@ type SrvOutbSettings struct {
 	DomainStrategy string                    `json:"domainStrategy"`
 }
 
+func (s *SrvOutbSettings) Validate() error {
+	if s.SecretKey == "" {
+		return errors.New("outbound.settings.secretKey cannot be empty")
+	}
+
+	if len(s.Address) == 0 {
+		return errors.New("outbound.settings.address array cannot be empty")
+	}
+
+	for _, addr := range s.Address {
+		if !utils.IsValidIPOrCIDR(addr) {
+			return fmt.Errorf(
+				"outbound.settings.address '%s' is not a valid address", addr)
+		}
+	}
+
+	for _, peer := range s.Peers {
+		err := peer.Validate()
+		if err != nil {
+			return err
+		}
+	}
+
+	if s.Mtu < 1280 || s.Mtu > 1500 {
+		return fmt.Errorf("outbound.settings.mtu must be between 1280 and 1500")
+	}
+
+	if len(s.Reserved) == 0 {
+		return errors.New("outbound.settings.reserved array cannot be empty")
+	}
+
+	if s.Workers < 1 {
+		return errors.New("outbound.settings.workers must be at least 1")
+	}
+
+	switch s.DomainStrategy {
+	case "ForceIPv6v4", "ForceIPv6", "ForceIPv4v6", "ForceIPv4", "ForceIP":
+	case "":
+		return errors.New("outbound.settings.domainStrategy cannot be empty")
+	default:
+		return fmt.Errorf("outbound.settings.domainStrategy is '%s' while only "+
+			"ForceIPv6v4, ForceIPv6, ForceIPv4v6, ForceIPv4, and ForceIP are supported",
+			s.DomainStrategy)
+	}
+
+	return nil
+}
+
 type SrvOutbound struct {
 	Protocol string           `json:"protocol"`
 	Tag      string           `json:"tag"`
