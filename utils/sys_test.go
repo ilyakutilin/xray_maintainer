@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	"errors"
@@ -11,7 +11,7 @@ import (
 )
 
 func TestCheckSudo(t *testing.T) {
-	err := checkSudo()
+	err := CheckSudo()
 
 	if os.Geteuid() == 0 {
 		// Running as root - should return nil
@@ -78,34 +78,34 @@ func TestExecuteCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			output, err := executeCommand(tt.cmdStr)
+			output, err := ExecuteCommand(tt.cmdStr)
 
 			if (err != nil) != tt.wantError {
-				t.Errorf("executeCommand() error = %v, wantError %v", err, tt.wantError)
+				t.Errorf("ExecuteCommand() error = %v, wantError %v", err, tt.wantError)
 				return
 			}
 
 			if !tt.wantError {
 				// For successful cases, check the output
 				if output != tt.wantOutput {
-					t.Errorf("executeCommand() = %q, want %q", output, tt.wantOutput)
+					t.Errorf("ExecuteCommand() = %q, want %q", output, tt.wantOutput)
 				}
 			} else {
 				// For error cases, check if the error contains expected substring
 				if err != nil && tt.errorSubstr != "" && !strings.Contains(err.Error(), tt.errorSubstr) {
-					t.Errorf("executeCommand() error = %v, want containing %q", err, tt.errorSubstr)
+					t.Errorf("ExecuteCommand() error = %v, want containing %q", err, tt.errorSubstr)
 				}
 
 				// Also verify that we get stderr output when there's an error
 				if output == "" {
-					t.Error("executeCommand() returned empty stderr output for failed command")
+					t.Error("ExecuteCommand() returned empty stderr output for failed command")
 				}
 			}
 		})
 	}
 
 	t.Run("nonexistent command", func(t *testing.T) {
-		_, err := executeCommand("nonexistentcommand123")
+		_, err := ExecuteCommand("nonexistentcommand123")
 		if err == nil {
 			t.Error("expected error for nonexistent command, got nil")
 		}
@@ -147,9 +147,9 @@ func TestRestartService(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := restartService(tt.serviceName, tt.mockExec)
+			err := RestartService(tt.serviceName, tt.mockExec)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("restartService() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("RestartService() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -216,7 +216,7 @@ func TestCheckServiceStatus(t *testing.T) {
 				return tt.mockResponse, tt.mockError
 			}
 
-			active, err := checkServiceStatus(tt.serviceName, mockExecutor)
+			active, err := CheckServiceStatus(tt.serviceName, mockExecutor)
 
 			if (err != nil) != tt.expectErr {
 				t.Errorf("expected error: %v, got: %v", tt.expectErr, err)
@@ -239,7 +239,7 @@ func TestCheckServiceStatusWithDefaultExecutor(t *testing.T) {
 		return "active", nil
 	}
 
-	active, err := checkServiceStatus("nginx", nil)
+	active, err := CheckServiceStatus("nginx", nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -307,7 +307,7 @@ func TestCheckOperability(t *testing.T) {
 				return "", nil
 			}
 
-			err := checkOperability(tt.serviceName, mockExecutor)
+			err := CheckOperability(tt.serviceName, mockExecutor)
 
 			// Test error conditions
 			if tt.expectedErr == nil && err != nil {
@@ -335,8 +335,8 @@ func TestCheckOperabilityIntegration(t *testing.T) {
 
 	// Test with a real service that should exist on most systems
 	serviceName := "cron"
-	err = checkOperability(serviceName, nil)
+	err = CheckOperability(serviceName, nil)
 	if err != nil {
-		t.Errorf("checkOperability failed: %v", err)
+		t.Errorf("CheckOperability failed: %v", err)
 	}
 }

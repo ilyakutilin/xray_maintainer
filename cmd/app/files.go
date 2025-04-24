@@ -11,6 +11,8 @@ import (
 	"os/user"
 	"path/filepath"
 	"strings"
+
+	"github.com/ilyakutilin/xray_maintainer/utils"
 )
 
 type ReleaseChecker interface {
@@ -382,7 +384,7 @@ func updateFile(file File, debug bool) error {
 
 	if !debug {
 		logger.Info.Println("Checking operability of xray after the file update...")
-		if err = checkOperability("xray", nil); err != nil {
+		if err = utils.CheckOperability("xray", nil); err != nil {
 			logger.Error.Printf("Something went wrong with the %s file update, restoring the backup file...\n", fileName)
 			err = restoreFile(backup, file.filePath)
 			return err

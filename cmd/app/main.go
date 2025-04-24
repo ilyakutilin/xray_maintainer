@@ -8,6 +8,7 @@ import (
 	"runtime/debug"
 
 	"github.com/joho/godotenv"
+	// "github.com/ilyakutilin/xray_maintainer/utils"
 )
 
 func main() {
@@ -65,8 +66,8 @@ func main() {
 	}
 
 	// // TODO: Add error handling
-	// _ = restartService("xray")
-	// xrayActive, _ := checkServiceStatus("xray")
+	// _ = RestartService("xray")
+	// xrayActive, _ := utils.CheckServiceStatus("xray")
 	// if !xrayActive {
 	// 	log.Fatal("XRay service failed to start")
 	// }

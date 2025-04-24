@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	"bytes"
@@ -9,8 +9,8 @@ import (
 )
 
 // Checks if the app has sudo privileges
-// TODO: checkSudo() is currently used only in the tests - check implementation!
-func checkSudo() error {
+// TODO: CheckSudo() is currently used only in the tests - check implementation!
+func CheckSudo() error {
 	if os.Geteuid() != 0 {
 		return errors.New("this application requires sudo/root privileges")
 	}
@@ -18,7 +18,7 @@ func checkSudo() error {
 }
 
 // Runs a shell command and returns its output or an error.
-func executeCommand(cmdStr string) (string, error) {
+func ExecuteCommand(cmdStr string) (string, error) {
 	cmd := exec.Command("bash", "-c", cmdStr)
 	var out bytes.Buffer
 	var stderr bytes.Buffer
@@ -36,9 +36,9 @@ func executeCommand(cmdStr string) (string, error) {
 
 type CommandExecutor func(string) (string, error)
 
-var defaultExecutor CommandExecutor = executeCommand
+var defaultExecutor CommandExecutor = ExecuteCommand
 
-func restartService(serviceName string, executor CommandExecutor) error {
+func RestartService(serviceName string, executor CommandExecutor) error {
 	if executor == nil {
 		executor = defaultExecutor
 	}
@@ -47,7 +47,7 @@ func restartService(serviceName string, executor CommandExecutor) error {
 	return err
 }
 
-func checkServiceStatus(serviceName string, executor CommandExecutor) (bool, error) {
+func CheckServiceStatus(serviceName string, executor CommandExecutor) (bool, error) {
 	if executor == nil {
 		executor = defaultExecutor
 	}
@@ -59,12 +59,12 @@ func checkServiceStatus(serviceName string, executor CommandExecutor) (bool, err
 	return output == "active", nil
 }
 
-func checkOperability(serviceName string, executor CommandExecutor) error {
-	err := restartService(serviceName, executor)
+func CheckOperability(serviceName string, executor CommandExecutor) error {
+	err := RestartService(serviceName, executor)
 	if err != nil {
 		return err
 	}
-	isActive, err := checkServiceStatus(serviceName, executor)
+	isActive, err := CheckServiceStatus(serviceName, executor)
 	if err != nil {
 		return err
 	}
