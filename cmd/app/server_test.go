@@ -88,12 +88,12 @@ func TestSrvInbSniffing_Validate(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "disabled with empty destOverride",
+			name: "disabled",
 			sniffing: SrvInbSniffing{
-				Enabled:      false,
-				DestOverride: []string{},
+				Enabled: false,
 			},
-			wantErr: false,
+			wantErr:     true,
+			errContains: "inbound.sniffing must be enabled",
 		},
 		{
 			name: "enabled but empty destOverride",
@@ -102,7 +102,7 @@ func TestSrvInbSniffing_Validate(t *testing.T) {
 				DestOverride: []string{},
 			},
 			wantErr:     true,
-			errContains: "must have the inbound block with sniffing enabled and destOverride set",
+			errContains: "inbound.sniffing.destOverride shall be set",
 		},
 		{
 			name: "invalid destOverride value",
@@ -111,7 +111,7 @@ func TestSrvInbSniffing_Validate(t *testing.T) {
 				DestOverride: []string{"invalid"},
 			},
 			wantErr:     true,
-			errContains: `allowed values: "http", "tls", "quic"`,
+			errContains: "wrong value for inbound.sniffing.destOverride: 'invalid'. ",
 		},
 		{
 			name: "mixed valid and invalid destOverride",
@@ -120,7 +120,7 @@ func TestSrvInbSniffing_Validate(t *testing.T) {
 				DestOverride: []string{"http", "invalid", "tls"},
 			},
 			wantErr:     true,
-			errContains: `allowed values: "http", "tls", "quic"`,
+			errContains: "wrong value for inbound.sniffing.destOverride: 'invalid'. ",
 		},
 	}
 
@@ -174,7 +174,7 @@ func TestSrvInbSettingsClient_Validate(t *testing.T) {
 				Email: "user@example.com",
 			},
 			wantErr:     true,
-			errContains: "client id is '" + invalidUUID + "' which is not a valid UUID",
+			errContains: "inbound.settings.client.id is '" + invalidUUID + "' which is not a valid UUID",
 		},
 		{
 			name: "empty email",
@@ -193,7 +193,7 @@ func TestSrvInbSettingsClient_Validate(t *testing.T) {
 				Flow:  "invalid-flow",
 			},
 			wantErr:     true,
-			errContains: "client flow is 'invalid-flow' while only xtls-rprx-vision is allowed",
+			errContains: "inbound.settings.client.flow is 'invalid-flow' while only xtls-rprx-vision is allowed",
 		},
 		{
 			name: "multiple errors: invalid UUID and empty email",
@@ -201,10 +201,8 @@ func TestSrvInbSettingsClient_Validate(t *testing.T) {
 				ID:    invalidUUID,
 				Email: "",
 			},
-			wantErr: true,
-			// We can't test for both errors since validation stops at first error
-			// This tests that at least one error is caught
-			errContains: "",
+			wantErr:     true,
+			errContains: "\n",
 		},
 	}
 
@@ -237,149 +235,133 @@ func TestSrvInbSettings_Validate(t *testing.T) {
 		wantErr     bool
 		errContains string
 	}{
-		// Clients validation
+		// Empty Clients are allowed
 		{
-			name:        "nil clients",
-			settings:    SrvInbSettings{Clients: nil},
-			wantErr:     true,
-			errContains: "client list should not be empty",
+			name: "nil clients",
+			settings: SrvInbSettings{
+				Clients:    nil,
+				Decryption: "none",
+			},
+			wantErr: false,
 		},
 		{
 			name: "empty clients slice",
 			settings: SrvInbSettings{
 				Clients:    &[]SrvInbSettingsClient{},
 				Decryption: "none",
-				Password:   "longenoughpassword123",
-				Network:    "tcp",
 			},
-			wantErr:     true,
-			errContains: "client list should not be empty",
+			wantErr: false,
 		},
 
-		// Decryption validation
+		// Mutual exclusivity validation
 		{
-			name: "valid decryption 'none'",
+			name: "vless, no shadowsocks",
 			settings: SrvInbSettings{
 				Clients:    &validClients,
 				Decryption: "none",
-				Password:   "longenoughpassword123",
-				Network:    "tcp",
 			},
 			wantErr: false,
 		},
 		{
-			name: "empty decryption",
+			name: "shadowsocks, no vless",
+			settings: SrvInbSettings{
+				Method:   "2022-blake3-aes-128-gcm",
+				Password: "longenoughpassword123",
+				Network:  "tcp",
+			},
+			wantErr: false,
+		},
+		{
+			name: "mix of vless and shadowsocks",
 			settings: SrvInbSettings{
 				Clients:    &validClients,
-				Decryption: "",
-				Password:   "longenoughpassword123",
+				Decryption: "none",
 				Network:    "tcp",
 			},
 			wantErr:     true,
-			errContains: "decryption cannot be left empty",
+			errContains: "cannot set inbound.settings.decryption together",
 		},
+		{
+			name:        "empty settings",
+			settings:    SrvInbSettings{},
+			wantErr:     true,
+			errContains: "either inbound.settings.decryption or",
+		},
+		{
+			name: "incomplete shadowsocks",
+			settings: SrvInbSettings{
+				Method: "2022-blake3-aes-128-gcm",
+			},
+			wantErr:     true,
+			errContains: "shall all be set if at least one of them is set",
+		},
+
+		// Decryption validation
 		{
 			name: "invalid decryption",
 			settings: SrvInbSettings{
 				Clients:    &validClients,
 				Decryption: "invalid",
-				Password:   "longenoughpassword123",
-				Network:    "tcp",
 			},
 			wantErr:     true,
-			errContains: "decryption is 'invalid' while only 'none' is allowed",
+			errContains: "inbound.settings.decryption is 'invalid' while only 'none' is allowed",
 		},
 
 		// Method validation
 		{
-			name: "valid method 2022-blake3-aes-128-gcm",
+			name: "valid method",
 			settings: SrvInbSettings{
-				Clients:    &validClients,
-				Decryption: "none",
-				Method:     "2022-blake3-aes-128-gcm",
-				Password:   "longenoughpassword123",
-				Network:    "tcp",
-			},
-			wantErr: false,
-		},
-		{
-			name: "empty method (valid)",
-			settings: SrvInbSettings{
-				Clients:    &validClients,
-				Decryption: "none",
-				Password:   "longenoughpassword123",
-				Network:    "tcp",
+				Method:   "2022-blake3-aes-128-gcm",
+				Password: "longenoughpassword123",
+				Network:  "tcp,udp",
 			},
 			wantErr: false,
 		},
 		{
 			name: "invalid method",
 			settings: SrvInbSettings{
-				Clients:    &validClients,
-				Decryption: "none",
-				Method:     "invalid-method",
-				Password:   "longenoughpassword123",
-				Network:    "tcp",
+				Method:   "invalid-method",
+				Password: "longenoughpassword123",
+				Network:  "tcp",
 			},
 			wantErr:     true,
-			errContains: "method is 'invalid-method' while only the following options are allowed",
+			errContains: "inbound.settings.method is 'invalid-method' while only the following options are allowed",
 		},
 
 		// Password validation
 		{
 			name: "password too short",
 			settings: SrvInbSettings{
-				Clients:    &validClients,
-				Decryption: "none",
-				Password:   "short",
-				Network:    "tcp",
+				Method:   "2022-blake3-aes-128-gcm",
+				Password: "short",
+				Network:  "tcp",
 			},
 			wantErr:     true,
-			errContains: "password is too short",
+			errContains: "inbound.settings.password is too short",
 		},
 
 		// Network validation
 		{
-			name: "valid network tcp",
-			settings: SrvInbSettings{
-				Clients:    &validClients,
-				Decryption: "none",
-				Password:   "longenoughpassword123",
-				Network:    "tcp",
-			},
-			wantErr: false,
-		},
-		{
-			name: "valid network tcp,udp",
-			settings: SrvInbSettings{
-				Clients:    &validClients,
-				Decryption: "none",
-				Password:   "longenoughpassword123",
-				Network:    "tcp,udp",
-			},
-			wantErr: false,
-		},
-		{
-			name: "empty network (invalid)",
-			settings: SrvInbSettings{
-				Clients:    &validClients,
-				Decryption: "none",
-				Password:   "longenoughpassword123",
-				Network:    "",
-			},
-			wantErr:     true,
-			errContains: "network cannot be left empty",
-		},
-		{
 			name: "invalid network",
 			settings: SrvInbSettings{
-				Clients:    &validClients,
-				Decryption: "none",
-				Password:   "longenoughpassword123",
-				Network:    "invalid",
+				Method:   "2022-blake3-aes-128-gcm",
+				Password: "longenoughpassword123",
+				Network:  "invalid",
 			},
 			wantErr:     true,
 			errContains: "network is 'invalid' while only the following options are allowed",
+		},
+
+		// Multiple errors
+		{
+			name: "multiple errors",
+			settings: SrvInbSettings{
+				Method:   "invalid-method",
+				Password: "short",
+				Network:  "invalid",
+			},
+			wantErr:     true,
+			errContains: "\n",
 		},
 	}
 
@@ -402,11 +384,9 @@ func TestSrvInbSettings_Validate(t *testing.T) {
 func TestSrvInbStreamRealitySettings(t *testing.T) {
 	// Helper valid domains
 	validDomain := "example.com:443"
-	validDomain2 := "sub.example.com:443"
-	invalidDomain := "example..com:443"
-	invalidPort := "example.com:80"
-	noPort := "example.com"
-	ipDest := "1.1.1.1:443"
+	validServerNames := []string{"example.com"}
+	validPrivateKey := "valid-key"
+	validShortIds := []string{""}
 
 	tests := []struct {
 		name        string
@@ -414,125 +394,14 @@ func TestSrvInbStreamRealitySettings(t *testing.T) {
 		wantErr     bool
 		errContains string
 	}{
-		// IsDestValid tests
-		{
-			name: "valid domain dest",
-			settings: SrvInbStreamRealitySettings{
-				Dest:        validDomain,
-				ServerNames: []string{"example.com"},
-				PrivateKey:  "test-key",
-			},
-			wantErr: false,
-		},
-		{
-			name: "valid subdomain dest",
-			settings: SrvInbStreamRealitySettings{
-				Dest:        validDomain2,
-				ServerNames: []string{"sub.example.com"},
-				PrivateKey:  "test-key",
-			},
-			wantErr: false,
-		},
-		{
-			name: "valid 1.1.1.1 dest",
-			settings: SrvInbStreamRealitySettings{
-				Dest:        ipDest,
-				ServerNames: []string{""},
-				PrivateKey:  "test-key",
-			},
-			wantErr: false,
-		},
-		{
-			name: "invalid domain format",
-			settings: SrvInbStreamRealitySettings{
-				Dest:        invalidDomain,
-				ServerNames: []string{"example..com"},
-				PrivateKey:  "test-key",
-			},
-			wantErr:     true,
-			errContains: "which is not a valid reality dest",
-		},
-		{
-			name: "invalid port",
-			settings: SrvInbStreamRealitySettings{
-				Dest:        invalidPort,
-				ServerNames: []string{"example.com"},
-				PrivateKey:  "test-key",
-			},
-			wantErr:     true,
-			errContains: "which is not a valid reality dest",
-		},
-		{
-			name: "missing port",
-			settings: SrvInbStreamRealitySettings{
-				Dest:        noPort,
-				ServerNames: []string{"example.com"},
-				PrivateKey:  "test-key",
-			},
-			wantErr:     true,
-			errContains: "which is not a valid reality dest",
-		},
-
-		// ValidateServerNames tests
-		{
-			name: "empty serverNames",
-			settings: SrvInbStreamRealitySettings{
-				Dest:        validDomain,
-				ServerNames: []string{},
-				PrivateKey:  "test-key",
-			},
-			wantErr:     true,
-			errContains: "serverNames must have exactly one element",
-		},
-		{
-			name: "multiple serverNames",
-			settings: SrvInbStreamRealitySettings{
-				Dest:        validDomain,
-				ServerNames: []string{"example.com", "extra.com"},
-				PrivateKey:  "test-key",
-			},
-			wantErr:     true,
-			errContains: "serverNames must have exactly one element",
-		},
-		{
-			name: "mismatched serverName",
-			settings: SrvInbStreamRealitySettings{
-				Dest:        validDomain,
-				ServerNames: []string{"wrong.com"},
-				PrivateKey:  "test-key",
-			},
-			wantErr:     true,
-			errContains: "serverName 'wrong.com' does not match the domain",
-		},
-		{
-			name: "non-empty serverName with 1.1.1.1",
-			settings: SrvInbStreamRealitySettings{
-				Dest:        ipDest,
-				ServerNames: []string{"example.com"},
-				PrivateKey:  "test-key",
-			},
-			wantErr:     true,
-			errContains: "when the dest is '1.1.1.1:443', serverName must be empty",
-		},
-		{
-			name: "serverName with wildcard",
-			settings: SrvInbStreamRealitySettings{
-				Dest:        validDomain,
-				ServerNames: []string{"*.example.com"},
-				PrivateKey:  "test-key",
-			},
-			wantErr:     true,
-			errContains: "wildcards are not suppported in serverNames",
-		},
-
-		// Other field validations
 		{
 			name: "invalid xver",
 			settings: SrvInbStreamRealitySettings{
 				Dest:        validDomain,
-				ServerNames: []string{"example.com"},
-				PrivateKey:  "test-key",
+				ServerNames: validServerNames,
+				PrivateKey:  validPrivateKey,
 				Xver:        1,
+				ShortIds:    validShortIds,
 			},
 			wantErr:     true,
 			errContains: "xver is '1' while only 0 is supported",
@@ -541,22 +410,84 @@ func TestSrvInbStreamRealitySettings(t *testing.T) {
 			name: "empty privateKey",
 			settings: SrvInbStreamRealitySettings{
 				Dest:        validDomain,
-				ServerNames: []string{"example.com"},
+				ServerNames: validServerNames,
 				PrivateKey:  "",
+				ShortIds:    validShortIds,
 			},
 			wantErr:     true,
 			errContains: "privateKey cannot be empty",
 		},
 		{
-			name: "non-empty shortIds",
+			name: "empty shortIds array",
 			settings: SrvInbStreamRealitySettings{
 				Dest:        validDomain,
-				ServerNames: []string{"example.com"},
+				ServerNames: validServerNames,
+				PrivateKey:  validPrivateKey,
+				ShortIds:    []string{},
+			},
+			wantErr:     true,
+			errContains: "there are 0 elements while there must have exactly one element",
+		},
+		{
+			name: "too many shortIds in the array",
+			settings: SrvInbStreamRealitySettings{
+				Dest:        validDomain,
+				ServerNames: validServerNames,
+				PrivateKey:  validPrivateKey,
+				ShortIds:    []string{"123", "456"},
+			},
+			wantErr:     true,
+			errContains: "there are 2 elements while there must have exactly one element",
+		},
+		{
+			name: "non-empty shortId",
+			settings: SrvInbStreamRealitySettings{
+				Dest:        validDomain,
+				ServerNames: validServerNames,
 				PrivateKey:  "test-key",
 				ShortIds:    []string{"123"},
 			},
 			wantErr:     true,
-			errContains: "shortIds must be empty",
+			errContains: "shortId is '123' while it must be empty",
+		},
+
+		// IsDestValid propagation
+		{
+			name: "invalid dest",
+			settings: SrvInbStreamRealitySettings{
+				Dest:        "invalid",
+				ServerNames: []string{"invalid"},
+				PrivateKey:  validPrivateKey,
+				ShortIds:    validShortIds,
+			},
+			wantErr:     true,
+			errContains: "dest is 'invalid' which is not a valid reality dest",
+		},
+
+		// ValidateServerNames propagation
+		{
+			name: "invalid server names",
+			settings: SrvInbStreamRealitySettings{
+				Dest:        validDomain,
+				ServerNames: []string{"wrong.com"},
+				PrivateKey:  validPrivateKey,
+				ShortIds:    validShortIds,
+			},
+			wantErr:     true,
+			errContains: "serverName 'wrong.com' does not match the domain",
+		},
+
+		// Multiple errors
+		{
+			name: "multiple errors",
+			settings: SrvInbStreamRealitySettings{
+				Dest:        "invalid",
+				ServerNames: []string{"wrong.com"},
+				PrivateKey:  "",
+				ShortIds:    []string{"123"},
+			},
+			wantErr:     true,
+			errContains: "\n",
 		},
 	}
 
@@ -623,6 +554,9 @@ func TestValidateServerNames(t *testing.T) {
 		{"mismatched domain", SrvInbStreamRealitySettings{
 			Dest: "example.com:443", ServerNames: []string{"wrong.com"},
 		}, true, "does not match"},
+		{"domain with wildcard", SrvInbStreamRealitySettings{
+			Dest: "*.example.com:443", ServerNames: []string{"*.example.com"},
+		}, true, "wildcards are not suppported"},
 		{"ip with non-empty", SrvInbStreamRealitySettings{
 			Dest: "1.1.1.1:443", ServerNames: []string{"example.com"},
 		}, true, "must be empty"},
@@ -646,6 +580,7 @@ func TestSrvInbStreamSettings_Validate(t *testing.T) {
 		Dest:        "example.com:443",
 		ServerNames: []string{"example.com"},
 		PrivateKey:  "valid-private-key",
+		ShortIds:    []string{""},
 	}
 
 	// Setup invalid reality settings to test error propagation
@@ -722,7 +657,7 @@ func TestSrvInbStreamSettings_Validate(t *testing.T) {
 				RealitySettings: validReality,
 			},
 			wantErr:     true,
-			errContains: "only 'reality' security is supported",
+			errContains: "only 'reality' is supported",
 		},
 
 		// RealitySettings validation propagation
@@ -734,6 +669,18 @@ func TestSrvInbStreamSettings_Validate(t *testing.T) {
 				RealitySettings: invalidReality,
 			},
 			wantErr: true,
+		},
+
+		// Multiple errors
+		{
+			name: "multiple errors with propagation",
+			settings: SrvInbStreamSettings{
+				Network:         "wrong",
+				Security:        "reality",
+				RealitySettings: invalidReality,
+			},
+			wantErr:     true,
+			errContains: "only 'raw' or 'tcp' (which are interchangeable) are supported\nserverName '' does not match the domain",
 		},
 	}
 
@@ -753,65 +700,6 @@ func TestSrvInbStreamSettings_Validate(t *testing.T) {
 	}
 }
 
-// func TestSrvInbound_Validate(t *testing.T) {
-// 	tests := []struct {
-// 		name        string
-// 		inbound     SrvInbound
-// 		wantErr     bool
-// 		errContains string
-// 	}{
-// 		{
-// 			name: "valid vless protocol",
-// 			inbound: SrvInbound{
-// 				Protocol: "vless",
-// 			},
-// 			wantErr: false,
-// 		},
-// 		{
-// 			name: "valid shadowsocks protocol",
-// 			inbound: SrvInbound{
-// 				Protocol: "shadowsocks",
-// 			},
-// 			wantErr: false,
-// 		},
-// 		{
-// 			name: "empty protocol",
-// 			inbound: SrvInbound{
-// 				Protocol: "",
-// 			},
-// 			wantErr:     true,
-// 			errContains: "inbound.protocol cannot be empty",
-// 		},
-// 		{
-// 			name: "unsupported protocol",
-// 			inbound: SrvInbound{
-// 				Protocol: "unsupported",
-// 			},
-// 			wantErr:     true,
-// 			errContains: "only vless and shadowsocks protocols are supported",
-// 		},
-// 		{
-// 			name: "case sensitivity check",
-// 			inbound: SrvInbound{
-// 				Protocol: "VLESS", // assuming case matters
-// 			},
-// 			wantErr:     true,
-// 			errContains: "only vless and shadowsocks protocols are supported",
-// 		},
-// 	}
-
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			err := tt.inbound.Validate()
-// 			if tt.wantErr {
-// 				assertErrorContains(t, err, tt.errContains)
-// 			} else {
-// 				assertNoError(t, err)
-// 			}
-// 		})
-// 	}
-// }
-
 func TestSrvInbound_Validate(t *testing.T) {
 	// Helper valid configurations
 	validSniffing := SrvInbSniffing{
@@ -819,16 +707,14 @@ func TestSrvInbound_Validate(t *testing.T) {
 		DestOverride: []string{"http"},
 	}
 	validSettings := SrvInbSettings{
-		Clients:    &[]SrvInbSettingsClient{{ID: "123e4567-e89b-12d3-a456-426614174000", Email: "test@example.com"}},
 		Decryption: "none",
-		Password:   "longenoughpassword123",
-		Network:    "tcp",
 	}
 	validStreamSettings := &SrvInbStreamSettings{
 		RealitySettings: SrvInbStreamRealitySettings{
 			Dest:        "example.com:443",
 			ServerNames: []string{"example.com"},
 			PrivateKey:  "valid-key",
+			ShortIds:    []string{""},
 		},
 	}
 
@@ -963,7 +849,7 @@ func TestSrvInbound_Validate(t *testing.T) {
 				Settings: validSettings,
 			},
 			wantErr:     true,
-			errContains: "sniffing enabled and destOverride set",
+			errContains: "inbound.sniffing.destOverride shall be set",
 		},
 		{
 			name: "invalid settings",
@@ -974,14 +860,13 @@ func TestSrvInbound_Validate(t *testing.T) {
 				Listen:   externalIPv4,
 				Sniffing: validSniffing,
 				Settings: SrvInbSettings{
-					Clients:    &[]SrvInbSettingsClient{},
 					Decryption: "none",
 					Password:   "short",
 					Network:    "tcp",
 				},
 			},
 			wantErr:     true,
-			errContains: "client list should not be empty",
+			errContains: "cannot set inbound.settings.decryption together",
 		},
 		{
 			name: "invalid stream settings",
@@ -1000,6 +885,28 @@ func TestSrvInbound_Validate(t *testing.T) {
 			},
 			wantErr:     true,
 			errContains: "network is 'udp' while only 'raw' or 'tcp'",
+		},
+
+		// Multiple errors
+		{
+			name: "multiple errors",
+			inbound: SrvInbound{
+				Protocol: "vless",
+				Tag:      "vless-in",
+				Port:     443,
+				Listen:   externalIPv4,
+				Sniffing: SrvInbSniffing{
+					Enabled:      true,
+					DestOverride: []string{},
+				},
+				Settings: SrvInbSettings{
+					Decryption: "none",
+					Password:   "short",
+					Network:    "tcp",
+				},
+			},
+			wantErr:     true,
+			errContains: "\n",
 		},
 	}
 
@@ -1062,6 +969,15 @@ func TestSrvOutboundSettingsPeer_Validate(t *testing.T) {
 				PublicKey: validPublicKey,
 			},
 			wantErr: true,
+		},
+		{
+			name: "multiple errors",
+			peer: SrvOutboundSettingsPeer{
+				Endpoint:  "",
+				PublicKey: "",
+			},
+			wantErr:     true,
+			errContains: "\n",
 		},
 	}
 
@@ -1227,6 +1143,20 @@ func TestSrvOutbSettings_Validate(t *testing.T) {
 			wantErr:     true,
 			errContains: "outbound.settings.domainStrategy is 'InvalidStrategy' while only",
 		},
+		{
+			name: "multiple errors",
+			settings: SrvOutbSettings{
+				SecretKey:      "",
+				Address:        []string{},
+				Peers:          []SrvOutboundSettingsPeer{validPeer},
+				Mtu:            1199,
+				Reserved:       []int{1},
+				Workers:        0,
+				DomainStrategy: "",
+			},
+			wantErr:     true,
+			errContains: "\n",
+		},
 	}
 
 	for _, tt := range tests {
@@ -1350,6 +1280,17 @@ func TestSrvOutbound_Validate(t *testing.T) {
 			wantErr:     true,
 			errContains: "outbound.settings.secretKey cannot be empty",
 		},
+
+		// Multiple errors
+		{
+			name: "multiple errors",
+			outbound: SrvOutbound{
+				Protocol: "",
+				Tag:      "",
+			},
+			wantErr:     true,
+			errContains: "\n",
+		},
 	}
 
 	for _, tt := range tests {
@@ -1425,6 +1366,17 @@ func TestSrvRoutingRule_Validate(t *testing.T) {
 			},
 			wantErr:     true,
 			errContains: "routing.rules.outboundTag cannot be empty",
+		},
+
+		// Multiple errors
+		{
+			name: "multiple errors",
+			rule: SrvRoutingRule{
+				Type:        "",
+				OutboundTag: "",
+			},
+			wantErr:     true,
+			errContains: "\n",
 		},
 	}
 
@@ -1526,6 +1478,22 @@ func TestSrvRouting_Validate(t *testing.T) {
 			},
 			wantErr:     true,
 			errContains: "invalid routing.domainStrategy 'InvalidStrategy'",
+		},
+
+		// Multiple errors
+		{
+			name: "multiple errors",
+			routing: SrvRouting{
+				Rules: []SrvRoutingRule{
+					{
+						Type:        "",
+						OutboundTag: "",
+					},
+				},
+				DomainStrategy: "",
+			},
+			wantErr:     true,
+			errContains: "\n",
 		},
 	}
 
