@@ -454,6 +454,30 @@ type SrvRouting struct {
 	DomainStrategy string           `json:"domainStrategy"`
 }
 
+func (r *SrvRouting) Validate() error {
+	if len(r.Rules) == 0 {
+		return errors.New("routing.rules array cannot be empty")
+	}
+
+	for _, rule := range r.Rules {
+		err := rule.Validate()
+		if err != nil {
+			return err
+		}
+	}
+
+	switch r.DomainStrategy {
+	case "AsIs", "IPIfNonMatch", "IPOnDemand":
+	case "":
+		return errors.New("routing.domainStrategy cannot be empty")
+	default:
+		return fmt.Errorf("invalid routing.domainStrategy '%v': only 'AsIs', "+
+			"'IPIfNonMatch', and 'IPOnDemand' are supported", r.DomainStrategy)
+	}
+
+	return nil
+}
+
 type ServerConfig struct {
 	Log       Log           `json:"log"`
 	Inbounds  []SrvInbound  `json:"inbounds"`

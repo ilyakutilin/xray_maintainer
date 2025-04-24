@@ -1443,3 +1443,104 @@ func TestSrvRoutingRule_Validate(t *testing.T) {
 		})
 	}
 }
+
+func TestSrvRouting_Validate(t *testing.T) {
+	// Helper valid rule
+	validRule := SrvRoutingRule{
+		Type:        "field",
+		OutboundTag: "valid-outbound",
+	}
+
+	tests := []struct {
+		name        string
+		routing     SrvRouting
+		wantErr     bool
+		errContains string
+	}{
+		// Valid cases
+		{
+			name: "valid minimal routing",
+			routing: SrvRouting{
+				Rules:          []SrvRoutingRule{validRule},
+				DomainStrategy: "AsIs",
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid with multiple rules",
+			routing: SrvRouting{
+				Rules:          []SrvRoutingRule{validRule, validRule},
+				DomainStrategy: "IPIfNonMatch",
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid IPOnDemand strategy",
+			routing: SrvRouting{
+				Rules:          []SrvRoutingRule{validRule},
+				DomainStrategy: "IPOnDemand",
+			},
+			wantErr: false,
+		},
+
+		// Rules validation
+		{
+			name: "empty rules array",
+			routing: SrvRouting{
+				Rules:          []SrvRoutingRule{},
+				DomainStrategy: "AsIs",
+			},
+			wantErr:     true,
+			errContains: "routing.rules array cannot be empty",
+		},
+		{
+			name: "invalid rule in rules",
+			routing: SrvRouting{
+				Rules: []SrvRoutingRule{
+					{
+						Type:        "",
+						OutboundTag: "test",
+					},
+				},
+				DomainStrategy: "AsIs",
+			},
+			wantErr:     true,
+			errContains: "routing.rules.type cannot be empty",
+		},
+
+		// DomainStrategy validation
+		{
+			name: "empty domainStrategy",
+			routing: SrvRouting{
+				Rules:          []SrvRoutingRule{validRule},
+				DomainStrategy: "",
+			},
+			wantErr:     true,
+			errContains: "routing.domainStrategy cannot be empty",
+		},
+		{
+			name: "invalid domainStrategy",
+			routing: SrvRouting{
+				Rules:          []SrvRoutingRule{validRule},
+				DomainStrategy: "InvalidStrategy",
+			},
+			wantErr:     true,
+			errContains: "invalid routing.domainStrategy 'InvalidStrategy'",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.routing.Validate()
+			if tt.wantErr {
+				if tt.errContains != "" {
+					assertErrorContains(t, err, tt.errContains)
+				} else {
+					assertError(t, err)
+				}
+			} else {
+				assertNoError(t, err)
+			}
+		})
+	}
+}
