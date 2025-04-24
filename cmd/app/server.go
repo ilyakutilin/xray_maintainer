@@ -390,6 +390,35 @@ type SrvOutbound struct {
 	Settings *SrvOutbSettings `json:"settings,omitempty"`
 }
 
+func (o *SrvOutbound) Validate() error {
+	switch o.Protocol {
+	case "blackhole", "freedom", "vless", "shadowsocks", "wireguard":
+	case "":
+		return errors.New("outbound.protocol cannot be empty")
+	default:
+		return fmt.Errorf("invalid outbound.protocol '%v': only 'blackhole', "+
+			"'freedom', 'vless', 'shadowsocks', and 'wireguard' protocold are "+
+			"supported", o.Protocol)
+	}
+
+	if o.Tag == "" {
+		return errors.New("outbound.tag cannot be empty")
+	}
+
+	if o.Protocol == "wireguard" && o.Settings == nil {
+		return errors.New("outbound.settings cannot be empty for wireguard protocol")
+	}
+
+	if o.Settings != nil {
+		err := o.Settings.Validate()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 type SrvRoutingRule struct {
 	Type        string   `json:"type"`
 	OutboundTag string   `json:"outboundTag"`

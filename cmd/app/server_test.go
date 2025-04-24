@@ -1244,3 +1244,126 @@ func TestSrvOutbSettings_Validate(t *testing.T) {
 		})
 	}
 }
+
+func TestSrvOutbound_Validate(t *testing.T) {
+	// Helper valid settings for WireGuard
+	validSettings := &SrvOutbSettings{
+		SecretKey:      "test-key",
+		Address:        []string{"192.168.1.1"},
+		Peers:          []SrvOutboundSettingsPeer{{"example.com:8080", "valid-public-key"}},
+		Mtu:            1280,
+		Reserved:       []int{1, 2, 3},
+		Workers:        2,
+		DomainStrategy: "ForceIP",
+	}
+
+	tests := []struct {
+		name        string
+		outbound    SrvOutbound
+		wantErr     bool
+		errContains string
+	}{
+		// Protocol validation
+		{
+			name: "valid blackhole",
+			outbound: SrvOutbound{
+				Protocol: "blackhole",
+				Tag:      "blackhole-out",
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid freedom",
+			outbound: SrvOutbound{
+				Protocol: "freedom",
+				Tag:      "freedom-out",
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid wireguard with settings",
+			outbound: SrvOutbound{
+				Protocol: "wireguard",
+				Tag:      "wg-out",
+				Settings: validSettings,
+			},
+			wantErr: false,
+		},
+		{
+			name: "empty protocol",
+			outbound: SrvOutbound{
+				Protocol: "",
+				Tag:      "test",
+			},
+			wantErr:     true,
+			errContains: "outbound.protocol cannot be empty",
+		},
+		{
+			name: "invalid protocol",
+			outbound: SrvOutbound{
+				Protocol: "invalid",
+				Tag:      "test",
+			},
+			wantErr:     true,
+			errContains: "invalid outbound.protocol 'invalid'",
+		},
+
+		// Tag validation
+		{
+			name: "empty tag",
+			outbound: SrvOutbound{
+				Protocol: "freedom",
+				Tag:      "",
+			},
+			wantErr:     true,
+			errContains: "outbound.tag cannot be empty",
+		},
+
+		// WireGuard special case
+		{
+			name: "wireguard without settings",
+			outbound: SrvOutbound{
+				Protocol: "wireguard",
+				Tag:      "wg-out",
+				Settings: nil,
+			},
+			wantErr:     true,
+			errContains: "outbound.settings cannot be empty for wireguard protocol",
+		},
+
+		// Settings validation propagation
+		{
+			name: "invalid settings",
+			outbound: SrvOutbound{
+				Protocol: "wireguard",
+				Tag:      "wg-out",
+				Settings: &SrvOutbSettings{
+					SecretKey:      "", // Invalid empty secretKey
+					Address:        []string{"192.168.1.1"},
+					Peers:          []SrvOutboundSettingsPeer{{}},
+					Mtu:            1280,
+					Reserved:       []int{1},
+					Workers:        1,
+					DomainStrategy: "ForceIPv6",
+				},
+			},
+			wantErr:     true,
+			errContains: "outbound.settings.secretKey cannot be empty",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.outbound.Validate()
+			if tt.wantErr {
+				if tt.errContains != "" {
+					assertErrorContains(t, err, tt.errContains)
+				} else {
+					assertError(t, err)
+				}
+			} else {
+				assertNoError(t, err)
+			}
+		})
+	}
+}
