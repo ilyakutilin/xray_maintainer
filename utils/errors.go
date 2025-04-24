@@ -11,7 +11,7 @@ func (e Errors) Error() string {
 	for _, err := range e {
 		messages = append(messages, err.Error())
 	}
-	return strings.Join(messages, "; ")
+	return strings.Join(messages, "\n")
 }
 
 func (e *Errors) Append(err error) {
