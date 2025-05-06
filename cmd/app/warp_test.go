@@ -415,20 +415,20 @@ func TestGetClientConfig(t *testing.T) {
 				t.Fatalf("failed to parse server config file: %v", err)
 			}
 
-			warpConfig := Warp{
-				xrayProtocol:   tt.protocol,
-				xrayClientPort: 23456,
+			xrayClient := XrayClient{
+				ServerProtocol: tt.protocol,
+				Port:           23456,
 			}
 
 			if tt.panicMsg != "" {
 				assertPanics(t, func() {
-					_ = getClientConfig(&warpConfig, &xrayServerConfig)
+					_ = getClientConfig(&xrayClient, &xrayServerConfig)
 				}, tt.panicMsg)
 			} else {
 				assertDoesNotPanic(t, func() {
-					_ = getClientConfig(&warpConfig, &xrayServerConfig)
+					_ = getClientConfig(&xrayClient, &xrayServerConfig)
 				})
-				clientConfig := getClientConfig(&warpConfig, &xrayServerConfig)
+				clientConfig := getClientConfig(&xrayClient, &xrayServerConfig)
 
 				assertCorrectInt(t, 23456, clientConfig.Inbounds[0].Port)
 				assertCorrectString(t, "http", clientConfig.Inbounds[0].Protocol)

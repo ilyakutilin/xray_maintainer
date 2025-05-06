@@ -934,11 +934,12 @@ func TestUpdateFile(t *testing.T) {
 			tempFile := createTempFilePath(t)
 
 			file := File{
-				filePath: tempFile,
+				workdir: filepath.Dir(tempFile),
+				repo:    Repo{Filename: filepath.Base(tempFile)},
 			}
 
 			if test.oldContent != "" {
-				err := os.WriteFile(file.filePath, []byte(test.oldContent), 0644)
+				err := os.WriteFile(tempFile, []byte(test.oldContent), 0644)
 				if err != nil {
 					t.Fatalf("Failed to create file: %v", err)
 				}
@@ -956,14 +957,14 @@ func TestUpdateFile(t *testing.T) {
 				assertNoError(t, err)
 			}
 
-			content, err := os.ReadFile(file.filePath)
+			content, err := os.ReadFile(tempFile)
 			if err != nil {
 				t.Fatalf("Failed to read file: %v", err)
 			}
 			assertCorrectString(t, "mock content", string(content))
 
 			// Check that the versions file is updated
-			versionsFilePath := filepath.Join(filepath.Dir(file.filePath), "versions.json")
+			versionsFilePath := filepath.Join(filepath.Dir(tempFile), "versions.json")
 			versionsContent, err := os.ReadFile(versionsFilePath)
 			if err != nil {
 				t.Fatalf("Failed to read versions file: %v", err)
@@ -975,10 +976,10 @@ func TestUpdateFile(t *testing.T) {
 				t.Fatalf("Failed to unmarshal versions file: %v", err)
 			}
 
-			assertCorrectString(t, "1.2.3", versions[filepath.Base(file.filePath)])
+			assertCorrectString(t, "1.2.3", versions[filepath.Base(tempFile)])
 
 			// Check that there are no zip files in the folder
-			files, err := os.ReadDir(filepath.Dir(file.filePath))
+			files, err := os.ReadDir(filepath.Dir(tempFile))
 			if err != nil {
 				t.Fatalf("Failed to read directory: %v", err)
 			}

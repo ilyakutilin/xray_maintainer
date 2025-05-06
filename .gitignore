@@ -67,3 +67,4 @@ go.work
 xray/
 files/
 exp/
+config.yaml

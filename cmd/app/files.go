@@ -24,9 +24,8 @@ type FileDownloader interface {
 }
 
 type File struct {
-	filePath       string
-	releaseURL     string
-	downloadURL    string
+	repo           Repo
+	workdir        string
 	releaseChecker ReleaseChecker
 	downloader     FileDownloader
 }
@@ -35,11 +34,10 @@ type GithubReleaseChecker struct{}
 
 type GitHubFileDownloader struct{}
 
-func NewFile(filePath, releaseURL, downloadURL string) File {
+func NewFile(repo Repo, workdir string) File {
 	return File{
-		filePath:       filePath,
-		releaseURL:     releaseURL,
-		downloadURL:    downloadURL,
+		repo:           repo,
+		workdir:        workdir,
 		releaseChecker: GithubReleaseChecker{},
 		downloader:     GitHubFileDownloader{},
 	}
@@ -314,13 +312,14 @@ func restoreFile(src, dst string) error {
 func updateFile(file File, debug bool) error {
 	logger := GetLogger(debug)
 
-	fileName := filepath.Base(file.filePath)
-	fileDir := filepath.Dir(file.filePath)
+	fileName := file.repo.Filename
+	fileDir := file.workdir
+	filePath := filepath.Join(fileDir, fileName)
 	versionFilePath := filepath.Join(fileDir, "versions.json")
 
 	logger.Info.Printf("Starting to update the %s file...\n", fileName)
 
-	latestReleaseTag, err := file.releaseChecker.GetLatestReleaseTag(file.releaseURL)
+	latestReleaseTag, err := file.releaseChecker.GetLatestReleaseTag(file.repo.ReleaseInfoURL)
 	if err != nil {
 		return err
 	}
@@ -328,7 +327,7 @@ func updateFile(file File, debug bool) error {
 
 	logger.Info.Printf("Looking for %s file in %s...\n", fileName, fileDir)
 	var backup string
-	if fileExists(file.filePath) {
+	if fileExists(filePath) {
 		logger.Info.Printf("%s file found in %s\n", fileName, fileDir)
 		storedTag, err := getStoredReleaseTag(fileName, versionFilePath)
 		if err != nil {
@@ -341,7 +340,7 @@ func updateFile(file File, debug bool) error {
 		} else {
 			logger.Info.Printf("%s file is out-of-date, updating...\n", fileName)
 			logger.Info.Println("Creating a backup file just in case...")
-			backup, err = backupFile(file.filePath)
+			backup, err = backupFile(filePath)
 			if err != nil {
 				return err
 			}
@@ -356,20 +355,20 @@ func updateFile(file File, debug bool) error {
 		logger.Info.Printf("%s file not found in %s, starting to download...\n", fileName, fileDir)
 	}
 
-	err = file.downloader.Download(file.filePath, file.downloadURL)
+	err = file.downloader.Download(filePath, file.repo.DownloadURL)
 	if err != nil {
 		return err
 	}
-	logger.Info.Printf("File downloaded and is available at %s\n", file.filePath)
+	logger.Info.Printf("File downloaded and is available at %s\n", filePath)
 
-	fileIsZip, err := isZipFile(file.filePath)
+	fileIsZip, err := isZipFile(filePath)
 	if err != nil {
 		return err
 	}
 	if fileIsZip {
-		logger.Info.Printf("The downloaded file %s is a zip, so unzipping it...\n", filepath.Base(file.filePath))
-		zipFilePath := file.filePath + ".zip"
-		err = os.Rename(file.filePath, zipFilePath)
+		logger.Info.Printf("The downloaded file %s is a zip, so unzipping it...\n", filepath.Base(filePath))
+		zipFilePath := filePath + ".zip"
+		err = os.Rename(filePath, zipFilePath)
 		if err != nil {
 			return err
 		}
@@ -386,7 +385,7 @@ func updateFile(file File, debug bool) error {
 		logger.Info.Println("Checking operability of xray after the file update...")
 		if err = utils.CheckOperability("xray", nil); err != nil {
 			logger.Error.Printf("Something went wrong with the %s file update, restoring the backup file...\n", fileName)
-			err = restoreFile(backup, file.filePath)
+			err = restoreFile(backup, filePath)
 			return err
 		}
 

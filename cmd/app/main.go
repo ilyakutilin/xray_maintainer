@@ -4,25 +4,17 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
 	"runtime/debug"
-
-	"github.com/joho/godotenv"
 	// "github.com/ilyakutilin/xray_maintainer/utils"
 )
 
 func main() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Could not load .env file - relying on flags and defaults...")
-	}
-
 	cfg, err := loadConfig()
 	if err != nil {
 		log.Fatalf("Error loading config: %v", err)
 	}
 
-	logger := GetLogger(cfg.debug)
+	logger := GetLogger(cfg.Debug)
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -35,32 +27,20 @@ func main() {
 
 	// TODO: Check that the workdir exists, and if not, create it
 
-	xrayExecutable := NewFile(
-		filepath.Join(cfg.workdirPath, "xray"),
-		cfg.xrayCoreReleaseInfoURL,
-		cfg.xrayCoreDownloadURL,
-	)
+	xrayExecutable := NewFile(cfg.Repos.XrayCore, cfg.Workdir)
 	// TODO: Add error handling
-	_ = updateFile(xrayExecutable, cfg.debug)
+	_ = updateFile(xrayExecutable, cfg.Debug)
 
-	// geoipFile := NewFile(
-	// 	filepath.Join(cfg.workdirPath, "geoip.dat"),
-	// 	cfg.geoipReleaseInfoURL,
-	// 	cfg.geoipDownloadURL,
-	// )
-	// // TODO: Add error handling
-	// _ = updateFile(geoipFile, cfg.debug)
-
-	geositeFile := NewFile(
-		filepath.Join(cfg.workdirPath, "geosite.dat"),
-		cfg.geositeReleaseInfoURL,
-		cfg.geositeDownloadURL,
-	)
+	geoipFile := NewFile(cfg.Repos.Geoip, cfg.Workdir)
 	// TODO: Add error handling
-	_ = updateFile(geositeFile, cfg.debug)
+	_ = updateFile(geoipFile, cfg.Debug)
+
+	geositeFile := NewFile(cfg.Repos.Geosite, cfg.Workdir)
+	// TODO: Add error handling
+	_ = updateFile(geositeFile, cfg.Debug)
 
 	// TODO: Add error handling
-	err = updateWarp(cfg.warp, cfg.debug)
+	err = updateWarp(cfg.Xray, cfg.Debug)
 	if err != nil {
 		logger.Error.Fatalf("Error updating warp config: %v", err)
 	}
@@ -73,7 +53,7 @@ func main() {
 	// }
 
 	// TODO: Remove print stmt
-	fmt.Println(cfg.workdirPath)
-	fmt.Println(cfg.warp.xrayServerIP)
+	fmt.Println(cfg.Workdir)
+	fmt.Println(cfg.Xray.Server.IP)
 	fmt.Println(xrayExecutable)
 }

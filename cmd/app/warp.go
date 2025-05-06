@@ -94,13 +94,13 @@ func parseJSONFile[T any](jsonFilePath string, target *T, strict bool) error {
 	return nil
 }
 
-func getClientConfig(warpconfig *Warp, xrayServerConfig *ServerConfig) *ClientConfig {
+func getClientConfig(xrayClient *XrayClient, xrayServerConfig *ServerConfig) *ClientConfig {
 	var clientConfig ClientConfig
 
 	clientConfig.Log = xrayServerConfig.Log
 
 	clientInbound := ClientInbound{
-		Port:     warpconfig.xrayClientPort,
+		Port:     xrayClient.Port,
 		Protocol: "http",
 	}
 	clientConfig.Inbounds = append(clientConfig.Inbounds, clientInbound)
@@ -113,7 +113,7 @@ func getClientConfig(warpconfig *Warp, xrayServerConfig *ServerConfig) *ClientCo
 	var found bool
 	var routingRuleNetwork string
 	for _, inbound := range xrayServerConfig.Inbounds {
-		if inbound.Protocol == warpconfig.xrayProtocol {
+		if inbound.Protocol == xrayClient.ServerProtocol {
 			found = true
 			cs.Port = inbound.Port
 			cs.Method = inbound.Settings.Method
@@ -127,7 +127,7 @@ func getClientConfig(warpconfig *Warp, xrayServerConfig *ServerConfig) *ClientCo
 		panic(fmt.Sprintf("protocol %s has not been found in the xray server config "+
 			"inbounds, which means that the server config was not properly validated "+
 			"after parsing. Check your code so that the protocol required for the "+
-			"client operation is supported.", warpconfig.xrayProtocol))
+			"client operation is supported.", xrayClient.ServerProtocol))
 	}
 
 	if cs.Method == "" || cs.Password == "" {
@@ -135,12 +135,12 @@ func getClientConfig(warpconfig *Warp, xrayServerConfig *ServerConfig) *ClientCo
 			"but it still did not provide the required credentials for the client "+
 			"config, which means that the server config was not properly validated "+
 			"after parsing. Check your code so that the protocol required for the "+
-			"client operation is supported.", warpconfig.xrayProtocol))
+			"client operation is supported.", xrayClient.ServerProtocol))
 	}
 
 	clientOutbound := ClientOutbound{
-		Protocol: warpconfig.xrayProtocol,
-		Tag:      warpconfig.xrayProtocol,
+		Protocol: xrayClient.ServerProtocol,
+		Tag:      xrayClient.ServerProtocol,
 		Settings: ClientOutboundSettings{
 			Servers: []ClientOutboundSettingsServer{cs},
 		},
@@ -149,7 +149,7 @@ func getClientConfig(warpconfig *Warp, xrayServerConfig *ServerConfig) *ClientCo
 
 	clientRoutingRule := ClientRoutingRule{
 		Type:        "field",
-		OutboundTag: warpconfig.xrayProtocol,
+		OutboundTag: xrayClient.ServerProtocol,
 		Network:     routingRuleNetwork,
 	}
 
@@ -162,7 +162,7 @@ func getClientConfig(warpconfig *Warp, xrayServerConfig *ServerConfig) *ClientCo
 	return &clientConfig
 }
 
-func updateWarp(warpConfig Warp, debug bool) error {
+func updateWarp(xray Xray, debug bool) error {
 	logger := GetLogger(debug)
 
 	logger.Info.Println("Updating warp config...")
@@ -170,8 +170,8 @@ func updateWarp(warpConfig Warp, debug bool) error {
 	// Parse the existing xray config
 	logger.Info.Println("Parsing the existing xray config...")
 	var xrayServerConfig ServerConfig
-	if err := parseJSONFile(warpConfig.xrayServerConfigPath, &xrayServerConfig, true); err != nil {
-		return fmt.Errorf("error parsing xray server config at path %q: %w", warpConfig.xrayServerConfigPath, err)
+	if err := parseJSONFile(xray.Server.ConfigPath, &xrayServerConfig, true); err != nil {
+		return fmt.Errorf("error parsing xray server config at path %q: %w", xray.Server.ConfigPath, err)
 	}
 	logger.Info.Println("Successfully parsed xray server config...")
 
@@ -180,7 +180,7 @@ func updateWarp(warpConfig Warp, debug bool) error {
 	}
 
 	// Get the client config and verify that warp is active
-	clientConfig := getClientConfig(&warpConfig, &xrayServerConfig)
+	clientConfig := getClientConfig(&xray.Client, &xrayServerConfig)
 
 	// TODO: Everything below is temporary for checking
 	// You actually need to download the CF cred generator, launch it, parse the output,
@@ -195,7 +195,7 @@ func updateWarp(warpConfig Warp, debug bool) error {
 	}
 
 	// Open file for writing (or create if it doesn’t exist)
-	file, err := os.Create(filepath.Join(filepath.Dir(warpConfig.xrayServerConfigPath), "updated.json"))
+	file, err := os.Create(filepath.Join(filepath.Dir(xray.Server.ConfigPath), "updated.json"))
 	if err != nil {
 		return fmt.Errorf("error creating file: %w", err)
 	}
