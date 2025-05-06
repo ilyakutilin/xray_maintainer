@@ -1,0 +1,30 @@
+---
+debug: true
+workdir: /opt/xray/
+
+xray:
+  server:
+    ip: 123.234.123.234
+    config_filename: config.json
+  client:
+    port: 10801
+
+repos:
+  geoip:
+    release_info_url: 'https://api.github.com/repos/v2fly/geoip/releases/latest'
+    download_url: 'https://github.com/v2fly/geoip/releases/latest/download/geoip.dat'
+    filename: geoip.dat
+  geosite:
+    release_info_url: 'https://api.github.com/repos/v2fly/domain-list-community/releases/latest'
+    download_url: 'https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat'
+    filename: geosite.dat
+  xray_core:
+    release_info_url: 'https://api.github.com/repos/XTLS/Xray-core/releases/latest'
+    download_url: 'https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip'
+    filename: xray
+  cf_cred_generator:
+    release_info_url: 'https://api.github.com/repos/badafans/warp-reg/releases/latest'
+    download_url: 'https://github.com/badafans/warp-reg/releases/latest/download/main-linux-amd64'
+    filename: cf_cred_generator
+
+ip_checker_url: 'http://ip-api.com/json/'
