@@ -8,18 +8,28 @@ import (
 	// "github.com/ilyakutilin/xray_maintainer/utils"
 )
 
+type Application struct {
+	debug   bool
+	logger  *Logger
+	workdir string
+}
+
 func main() {
 	cfg, err := loadConfig()
 	if err != nil {
 		log.Fatalf("Error loading config: %v", err)
 	}
 
-	logger := GetLogger(cfg.Debug)
+	app := Application{
+		debug:   cfg.Debug,
+		logger:  GetLogger(cfg.Debug),
+		workdir: cfg.Workdir,
+	}
 
 	defer func() {
 		if r := recover(); r != nil {
 			stack := debug.Stack()
-			logger.Error.Printf("PANIC: %v\n%s", r, stack)
+			app.logger.Error.Printf("PANIC: %v\n%s", r, stack)
 			// TODO: Send a message with the panic info
 			os.Exit(1)
 		}
@@ -42,7 +52,7 @@ func main() {
 	// TODO: Add error handling
 	err = updateWarp(cfg.Xray, cfg.Debug)
 	if err != nil {
-		logger.Error.Fatalf("Error updating warp config: %v", err)
+		app.logger.Error.Fatalf("Error updating warp config: %v", err)
 	}
 
 	// // TODO: Add error handling
