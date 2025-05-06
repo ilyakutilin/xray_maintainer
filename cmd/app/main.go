@@ -50,7 +50,7 @@ func main() {
 	_ = app.updateFile(geositeFile, cfg.Debug)
 
 	// TODO: Add error handling
-	err = updateWarp(cfg.Xray, cfg.Debug)
+	err = app.updateWarp(cfg.Xray)
 	if err != nil {
 		app.logger.Error.Fatalf("Error updating warp config: %v", err)
 	}
