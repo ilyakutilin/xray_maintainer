@@ -8,18 +8,28 @@ import (
 	// "github.com/ilyakutilin/xray_maintainer/utils"
 )
 
+type Application struct {
+	debug   bool
+	logger  *Logger
+	workdir string
+}
+
 func main() {
 	cfg, err := loadConfig()
 	if err != nil {
 		log.Fatalf("Error loading config: %v", err)
 	}
 
-	logger := GetLogger(cfg.Debug)
+	app := Application{
+		debug:   cfg.Debug,
+		logger:  GetLogger(cfg.Debug),
+		workdir: cfg.Workdir,
+	}
 
 	defer func() {
 		if r := recover(); r != nil {
 			stack := debug.Stack()
-			logger.Error.Printf("PANIC: %v\n%s", r, stack)
+			app.logger.Error.Printf("PANIC: %v\n%s", r, stack)
 			// TODO: Send a message with the panic info
 			os.Exit(1)
 		}
@@ -27,22 +37,22 @@ func main() {
 
 	// TODO: Check that the workdir exists, and if not, create it
 
-	xrayExecutable := NewFile(cfg.Repos.XrayCore, cfg.Workdir)
+	xrayExecutable := NewFile(cfg.Repos.XrayCore)
 	// TODO: Add error handling
-	_ = updateFile(xrayExecutable, cfg.Debug)
+	_ = app.updateFile(xrayExecutable, cfg.Debug)
 
-	geoipFile := NewFile(cfg.Repos.Geoip, cfg.Workdir)
+	geoipFile := NewFile(cfg.Repos.Geoip)
 	// TODO: Add error handling
-	_ = updateFile(geoipFile, cfg.Debug)
+	_ = app.updateFile(geoipFile, cfg.Debug)
 
-	geositeFile := NewFile(cfg.Repos.Geosite, cfg.Workdir)
+	geositeFile := NewFile(cfg.Repos.Geosite)
 	// TODO: Add error handling
-	_ = updateFile(geositeFile, cfg.Debug)
+	_ = app.updateFile(geositeFile, cfg.Debug)
 
 	// TODO: Add error handling
-	err = updateWarp(cfg.Xray, cfg.Debug)
+	err = app.updateWarp(cfg.Xray)
 	if err != nil {
-		logger.Error.Fatalf("Error updating warp config: %v", err)
+		app.logger.Error.Fatalf("Error updating warp config: %v", err)
 	}
 
 	// // TODO: Add error handling

@@ -162,18 +162,16 @@ func getClientConfig(xrayClient *XrayClient, xrayServerConfig *ServerConfig) *Cl
 	return &clientConfig
 }
 
-func updateWarp(xray Xray, debug bool) error {
-	logger := GetLogger(debug)
-
-	logger.Info.Println("Updating warp config...")
+func (app *Application) updateWarp(xray Xray) error {
+	app.logger.Info.Println("Updating warp config...")
 
 	// Parse the existing xray config
-	logger.Info.Println("Parsing the existing xray config...")
+	app.logger.Info.Println("Parsing the existing xray config...")
 	var xrayServerConfig ServerConfig
 	if err := parseJSONFile(xray.Server.ConfigPath, &xrayServerConfig, true); err != nil {
 		return fmt.Errorf("error parsing xray server config at path %q: %w", xray.Server.ConfigPath, err)
 	}
-	logger.Info.Println("Successfully parsed xray server config...")
+	app.logger.Info.Println("Successfully parsed xray server config...")
 
 	if err := xrayServerConfig.Validate(); err != nil {
 		return fmt.Errorf("the parsed xray server config failed validation: %w", err)
