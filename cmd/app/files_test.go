@@ -933,9 +933,14 @@ func TestUpdateFile(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			tempFile := createTempFilePath(t)
 
-			file := File{
+			testApp := &Application{
+				debug:   true,
+				logger:  GetLogger(false),
 				workdir: filepath.Dir(tempFile),
-				repo:    Repo{Filename: filepath.Base(tempFile)},
+			}
+
+			file := File{
+				repo: Repo{Filename: filepath.Base(tempFile)},
 			}
 
 			if test.oldContent != "" {
@@ -948,7 +953,7 @@ func TestUpdateFile(t *testing.T) {
 			file.releaseChecker = test.releaseChecker
 			file.downloader = test.downloader
 
-			err := updateFile(file, true)
+			err := testApp.updateFile(file, true)
 
 			if test.errorExpected {
 				assertError(t, err)

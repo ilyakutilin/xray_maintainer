@@ -25,7 +25,6 @@ type FileDownloader interface {
 
 type File struct {
 	repo           Repo
-	workdir        string
 	releaseChecker ReleaseChecker
 	downloader     FileDownloader
 }
@@ -34,10 +33,9 @@ type GithubReleaseChecker struct{}
 
 type GitHubFileDownloader struct{}
 
-func NewFile(repo Repo, workdir string) File {
+func NewFile(repo Repo) File {
 	return File{
 		repo:           repo,
-		workdir:        workdir,
 		releaseChecker: GithubReleaseChecker{},
 		downloader:     GitHubFileDownloader{},
 	}
@@ -309,37 +307,35 @@ func restoreFile(src, dst string) error {
 // Checks if the version of the file by the specified fullPath (including the filename)
 // can be updated to a newer version based on the latest release version from Github.
 // Updates the file if necessary.
-func updateFile(file File, debug bool) error {
-	logger := GetLogger(debug)
-
+func (app *Application) updateFile(file File, debug bool) error {
 	fileName := file.repo.Filename
-	fileDir := file.workdir
+	fileDir := app.workdir
 	filePath := filepath.Join(fileDir, fileName)
 	versionFilePath := filepath.Join(fileDir, "versions.json")
 
-	logger.Info.Printf("Starting to update the %s file...\n", fileName)
+	app.logger.Info.Printf("Starting to update the %s file...\n", fileName)
 
 	latestReleaseTag, err := file.releaseChecker.GetLatestReleaseTag(file.repo.ReleaseInfoURL)
 	if err != nil {
 		return err
 	}
-	logger.Info.Printf("The latest release tag for %s: %s\n", fileName, latestReleaseTag)
+	app.logger.Info.Printf("The latest release tag for %s: %s\n", fileName, latestReleaseTag)
 
-	logger.Info.Printf("Looking for %s file in %s...\n", fileName, fileDir)
+	app.logger.Info.Printf("Looking for %s file in %s...\n", fileName, fileDir)
 	var backup string
 	if fileExists(filePath) {
-		logger.Info.Printf("%s file found in %s\n", fileName, fileDir)
+		app.logger.Info.Printf("%s file found in %s\n", fileName, fileDir)
 		storedTag, err := getStoredReleaseTag(fileName, versionFilePath)
 		if err != nil {
 			return err
 		}
 
 		if storedTag == latestReleaseTag {
-			logger.Info.Printf("%s file is already up-to-date, no further action required\n", fileName)
+			app.logger.Info.Printf("%s file is already up-to-date, no further action required\n", fileName)
 			return nil
 		} else {
-			logger.Info.Printf("%s file is out-of-date, updating...\n", fileName)
-			logger.Info.Println("Creating a backup file just in case...")
+			app.logger.Info.Printf("%s file is out-of-date, updating...\n", fileName)
+			app.logger.Info.Println("Creating a backup file just in case...")
 			backup, err = backupFile(filePath)
 			if err != nil {
 				return err
@@ -347,26 +343,26 @@ func updateFile(file File, debug bool) error {
 			defer func() {
 				err = os.Remove(backup)
 				if err != nil {
-					logger.Info.Printf("could not remove the backup file by path %s: %v", backup, err)
+					app.logger.Info.Printf("could not remove the backup file by path %s: %v", backup, err)
 				}
 			}()
 		}
 	} else {
-		logger.Info.Printf("%s file not found in %s, starting to download...\n", fileName, fileDir)
+		app.logger.Info.Printf("%s file not found in %s, starting to download...\n", fileName, fileDir)
 	}
 
 	err = file.downloader.Download(filePath, file.repo.DownloadURL)
 	if err != nil {
 		return err
 	}
-	logger.Info.Printf("File downloaded and is available at %s\n", filePath)
+	app.logger.Info.Printf("File downloaded and is available at %s\n", filePath)
 
 	fileIsZip, err := isZipFile(filePath)
 	if err != nil {
 		return err
 	}
 	if fileIsZip {
-		logger.Info.Printf("The downloaded file %s is a zip, so unzipping it...\n", filepath.Base(filePath))
+		app.logger.Info.Printf("The downloaded file %s is a zip, so unzipping it...\n", filepath.Base(filePath))
 		zipFilePath := filePath + ".zip"
 		err = os.Rename(filePath, zipFilePath)
 		if err != nil {
@@ -377,26 +373,26 @@ func updateFile(file File, debug bool) error {
 		if err != nil {
 			return err
 		}
-		logger.Info.Printf("File extracted and is available at %s\n", extractedFilePath)
-		logger.Info.Printf("Removing the zip file %s\n", zipFilePath)
+		app.logger.Info.Printf("File extracted and is available at %s\n", extractedFilePath)
+		app.logger.Info.Printf("Removing the zip file %s\n", zipFilePath)
 	}
 
 	if !debug {
-		logger.Info.Println("Checking operability of xray after the file update...")
+		app.logger.Info.Println("Checking operability of xray after the file update...")
 		if err = utils.CheckOperability("xray", nil); err != nil {
-			logger.Error.Printf("Something went wrong with the %s file update, restoring the backup file...\n", fileName)
+			app.logger.Error.Printf("Something went wrong with the %s file update, restoring the backup file...\n", fileName)
 			err = restoreFile(backup, filePath)
 			return err
 		}
 
 	}
 
-	logger.Info.Println("Xray is active, updating the stored release tag...")
+	app.logger.Info.Println("Xray is active, updating the stored release tag...")
 	err = updateStoredReleaseTag(fileName, latestReleaseTag, versionFilePath)
 	if err != nil {
 		return err
 	}
-	logger.Info.Printf("The %s file has been updated to version %s\n", fileName, latestReleaseTag)
+	app.logger.Info.Printf("The %s file has been updated to version %s\n", fileName, latestReleaseTag)
 
 	return nil
 }
