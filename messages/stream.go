@@ -15,7 +15,7 @@ type StreamSender struct{}
 //
 // Returns:
 //   - error: Always returns nil as this implementation does not perform actual sending.
-func (e *StreamSender) Send(msg Message) error {
+func (s *StreamSender) Send(msg Message) error {
 	fmt.Println("The following message would be sent:")
 	fmt.Printf("Subject: %s\n", msg.Subject)
 	fmt.Printf("Body: %s\n", msg.Body)
@@ -32,5 +32,10 @@ func (e *StreamSender) Send(msg Message) error {
 			fmt.Printf("%d) %s\n", i, err)
 		}
 	}
+	return nil
+}
+
+func (s *StreamSender) Validate() error {
+	// No validation needed for StreamSender
 	return nil
 }
