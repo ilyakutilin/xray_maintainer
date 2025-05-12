@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/ilyakutilin/xray_maintainer/utils"
 )
 
 func TestParseCFCreds(t *testing.T) {
@@ -332,11 +334,11 @@ func TestParseJSONFile(t *testing.T) {
 				if isConfigZero(target) {
 					t.Error("parseJSONFile() target was not modified")
 				}
-				assertCorrectString(t, "test", target.Name)
-				assertCorrectInt(t, 30, target.Timeout)
-				assertCorrectBool(t, true, target.Valid)
-				assertCorrectString(t, "localhost", target.Config.Host)
-				assertCorrectInt(t, 8080, target.Config.Port)
+				utils.AssertCorrectString(t, "test", target.Name)
+				utils.AssertCorrectInt(t, 30, target.Timeout)
+				utils.AssertCorrectBool(t, true, target.Valid)
+				utils.AssertCorrectString(t, "localhost", target.Config.Host)
+				utils.AssertCorrectInt(t, 8080, target.Config.Port)
 			}
 		})
 	}
@@ -421,24 +423,24 @@ func TestGetClientConfig(t *testing.T) {
 			}
 
 			if tt.panicMsg != "" {
-				assertPanics(t, func() {
+				utils.AssertPanics(t, func() {
 					_ = getClientConfig(&xrayClient, &xrayServerConfig)
 				}, tt.panicMsg)
 			} else {
-				assertDoesNotPanic(t, func() {
+				utils.AssertDoesNotPanic(t, func() {
 					_ = getClientConfig(&xrayClient, &xrayServerConfig)
 				})
 				clientConfig := getClientConfig(&xrayClient, &xrayServerConfig)
 
-				assertCorrectInt(t, 23456, clientConfig.Inbounds[0].Port)
-				assertCorrectString(t, "http", clientConfig.Inbounds[0].Protocol)
-				assertCorrectString(t, tt.protocol, clientConfig.Outbounds[0].Protocol)
-				assertCorrectString(t, tt.protocol, clientConfig.Outbounds[0].Tag)
-				assertCorrectInt(t, 12345, clientConfig.Outbounds[0].Settings.Servers[0].Port)
-				assertCorrectString(t, "testmethod", clientConfig.Outbounds[0].Settings.Servers[0].Method)
-				assertCorrectString(t, tt.password, clientConfig.Outbounds[0].Settings.Servers[0].Password)
-				assertCorrectString(t, "tcp,udp", clientConfig.Routing.Rules[0].Network)
-				assertCorrectString(t, "error", clientConfig.Log.Loglevel)
+				utils.AssertCorrectInt(t, 23456, clientConfig.Inbounds[0].Port)
+				utils.AssertCorrectString(t, "http", clientConfig.Inbounds[0].Protocol)
+				utils.AssertCorrectString(t, tt.protocol, clientConfig.Outbounds[0].Protocol)
+				utils.AssertCorrectString(t, tt.protocol, clientConfig.Outbounds[0].Tag)
+				utils.AssertCorrectInt(t, 12345, clientConfig.Outbounds[0].Settings.Servers[0].Port)
+				utils.AssertCorrectString(t, "testmethod", clientConfig.Outbounds[0].Settings.Servers[0].Method)
+				utils.AssertCorrectString(t, tt.password, clientConfig.Outbounds[0].Settings.Servers[0].Password)
+				utils.AssertCorrectString(t, "tcp,udp", clientConfig.Routing.Rules[0].Network)
+				utils.AssertCorrectString(t, "error", clientConfig.Log.Loglevel)
 			}
 		})
 	}

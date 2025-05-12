@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	"fmt"
@@ -11,35 +11,35 @@ import (
 
 // TODO: Write more specific assert functions to replace inline handling
 
-func assertCorrectString(t testing.TB, want, got string) {
+func AssertCorrectString(t testing.TB, want, got string) {
 	t.Helper()
 	if got != want {
 		t.Errorf("Expected %q, got %q", want, got)
 	}
 }
 
-func assertCorrectInt(t testing.TB, want, got int) {
+func AssertCorrectInt(t testing.TB, want, got int) {
 	t.Helper()
 	if got != want {
 		t.Errorf("Expected %d, got %d", want, got)
 	}
 }
 
-func assertCorrectBool(t testing.TB, want, got bool) {
+func AssertCorrectBool(t testing.TB, want, got bool) {
 	t.Helper()
 	if got != want {
 		t.Errorf("Expected %t, got %t", want, got)
 	}
 }
 
-func assertError(t testing.TB, err error) {
+func AssertError(t testing.TB, err error) {
 	t.Helper()
 	if err == nil {
 		t.Errorf("Wanted an error but didn't get one")
 	}
 }
 
-func assertErrorContains(t testing.TB, err error, substr string) {
+func AssertErrorContains(t testing.TB, err error, substr string) {
 	t.Helper()
 	if err == nil {
 		t.Errorf("Wanted an error but didn't get one")
@@ -49,17 +49,17 @@ func assertErrorContains(t testing.TB, err error, substr string) {
 	}
 }
 
-func assertNoError(t testing.TB, err error) {
+func AssertNoError(t testing.TB, err error) {
 	t.Helper()
 	if err != nil {
 		t.Errorf("Wanted no error but got: %v", err)
 	}
 }
 
-// assertPanics checks if fn() panics, and verifies that the panic message contains
+// AssertPanics checks if fn() panics, and verifies that the panic message contains
 // expected substring(s).
-// Usage: assertPanics(t, func() { panic("something very bad") }, "bad", "very")
-func assertPanics(t *testing.T, fn func(), substrings ...string) {
+// Usage: AssertPanics(t, func() { panic("something very bad") }, "bad", "very")
+func AssertPanics(t *testing.T, fn func(), substrings ...string) {
 	t.Helper()
 
 	defer func() {
@@ -78,9 +78,9 @@ func assertPanics(t *testing.T, fn func(), substrings ...string) {
 	fn()
 }
 
-// assertDoesNotPanic checks that fn() does not panic.
-// Usage: assertDoesNotPanic(t, func() { doSomethingSafe() })
-func assertDoesNotPanic(t *testing.T, fn func()) {
+// AssertDoesNotPanic checks that fn() does not panic.
+// Usage: AssertDoesNotPanic(t, func() { doSomethingSafe() })
+func AssertDoesNotPanic(t *testing.T, fn func()) {
 	t.Helper()
 
 	defer func() {
@@ -93,7 +93,7 @@ func assertDoesNotPanic(t *testing.T, fn func()) {
 }
 
 // Helper function to generate random strings for filenames
-func randomString(n int) string {
+func RandomString(n int) string {
 	const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	b := make([]byte, n)
 	for i := range b {
@@ -102,15 +102,15 @@ func randomString(n int) string {
 	return string(b)
 }
 
-func createTempFilePath(t testing.TB) string {
+func CreateTempFilePath(t testing.TB) string {
 	t.Helper()
 	tempDir := t.TempDir()
-	return filepath.Join(tempDir, "temp-file-"+randomString(8)+".tmp")
+	return filepath.Join(tempDir, "temp-file-"+RandomString(8)+".tmp")
 }
 
-func createTempFile(t testing.TB) (string, func()) {
+func CreateTempFile(t testing.TB) (string, func()) {
 	t.Helper()
-	tempFilePath := createTempFilePath(t)
+	tempFilePath := CreateTempFilePath(t)
 	f, err := os.Create(tempFilePath)
 	if err != nil {
 		t.Fatal(err)

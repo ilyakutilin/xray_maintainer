@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/ilyakutilin/xray_maintainer/utils"
 )
 
 type CFCreds struct {
@@ -71,7 +73,7 @@ func parseJSONFile[T any](jsonFilePath string, target *T, strict bool) error {
 		return fmt.Errorf("target must be a non-nil pointer")
 	}
 
-	if !fileExists(jsonFilePath) {
+	if !utils.FileExists(jsonFilePath) {
 		return fmt.Errorf("file %q does not exist", filepath.Base(jsonFilePath))
 	}
 

@@ -1,6 +1,10 @@
 package main
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/ilyakutilin/xray_maintainer/utils"
+)
 
 func TestLog_Validate(t *testing.T) {
 	tests := []struct {
@@ -56,9 +60,9 @@ func TestLog_Validate(t *testing.T) {
 			err := l.Validate()
 
 			if tt.wantErr {
-				assertErrorContains(t, err, tt.errMsg)
+				utils.AssertErrorContains(t, err, tt.errMsg)
 			} else {
-				assertNoError(t, err)
+				utils.AssertNoError(t, err)
 			}
 		})
 	}
@@ -129,12 +133,12 @@ func TestSrvInbSniffing_Validate(t *testing.T) {
 			err := tt.sniffing.Validate()
 			if tt.wantErr {
 				if tt.errContains != "" {
-					assertErrorContains(t, err, tt.errContains)
+					utils.AssertErrorContains(t, err, tt.errContains)
 				} else {
-					assertError(t, err)
+					utils.AssertError(t, err)
 				}
 			} else {
-				assertNoError(t, err)
+				utils.AssertNoError(t, err)
 			}
 		})
 	}
@@ -211,12 +215,12 @@ func TestSrvInbSettingsClient_Validate(t *testing.T) {
 			err := tt.client.Validate()
 			if tt.wantErr {
 				if tt.errContains != "" {
-					assertErrorContains(t, err, tt.errContains)
+					utils.AssertErrorContains(t, err, tt.errContains)
 				} else {
-					assertError(t, err)
+					utils.AssertError(t, err)
 				}
 			} else {
-				assertNoError(t, err)
+				utils.AssertNoError(t, err)
 			}
 		})
 	}
@@ -370,12 +374,12 @@ func TestSrvInbSettings_Validate(t *testing.T) {
 			err := tt.settings.Validate()
 			if tt.wantErr {
 				if tt.errContains != "" {
-					assertErrorContains(t, err, tt.errContains)
+					utils.AssertErrorContains(t, err, tt.errContains)
 				} else {
-					assertError(t, err)
+					utils.AssertError(t, err)
 				}
 			} else {
-				assertNoError(t, err)
+				utils.AssertNoError(t, err)
 			}
 		})
 	}
@@ -496,12 +500,12 @@ func TestSrvInbStreamRealitySettings(t *testing.T) {
 			err := tt.settings.Validate()
 			if tt.wantErr {
 				if tt.errContains != "" {
-					assertErrorContains(t, err, tt.errContains)
+					utils.AssertErrorContains(t, err, tt.errContains)
 				} else {
-					assertError(t, err)
+					utils.AssertError(t, err)
 				}
 			} else {
-				assertNoError(t, err)
+				utils.AssertNoError(t, err)
 			}
 		})
 	}
@@ -527,7 +531,7 @@ func TestIsDestValid(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			s := SrvInbStreamRealitySettings{Dest: tt.dest}
 			result := s.IsDestValid()
-			assertCorrectBool(t, tt.expect, result)
+			utils.AssertCorrectBool(t, tt.expect, result)
 		})
 	}
 }
@@ -566,9 +570,9 @@ func TestValidateServerNames(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := tt.settings.ValidateServerNames()
 			if tt.wantErr {
-				assertErrorContains(t, err, tt.errContains)
+				utils.AssertErrorContains(t, err, tt.errContains)
 			} else {
-				assertNoError(t, err)
+				utils.AssertNoError(t, err)
 			}
 		})
 	}
@@ -689,12 +693,12 @@ func TestSrvInbStreamSettings_Validate(t *testing.T) {
 			err := tt.settings.Validate()
 			if tt.wantErr {
 				if tt.errContains != "" {
-					assertErrorContains(t, err, tt.errContains)
+					utils.AssertErrorContains(t, err, tt.errContains)
 				} else {
-					assertError(t, err)
+					utils.AssertError(t, err)
 				}
 			} else {
-				assertNoError(t, err)
+				utils.AssertNoError(t, err)
 			}
 		})
 	}
@@ -915,12 +919,12 @@ func TestSrvInbound_Validate(t *testing.T) {
 			err := tt.inbound.Validate()
 			if tt.wantErr {
 				if tt.errContains != "" {
-					assertErrorContains(t, err, tt.errContains)
+					utils.AssertErrorContains(t, err, tt.errContains)
 				} else {
-					assertError(t, err)
+					utils.AssertError(t, err)
 				}
 			} else {
-				assertNoError(t, err)
+				utils.AssertNoError(t, err)
 			}
 		})
 	}
@@ -986,12 +990,12 @@ func TestSrvOutboundSettingsPeer_Validate(t *testing.T) {
 			err := tt.peer.Validate()
 			if tt.wantErr {
 				if tt.errContains != "" {
-					assertErrorContains(t, err, tt.errContains)
+					utils.AssertErrorContains(t, err, tt.errContains)
 				} else {
-					assertError(t, err)
+					utils.AssertError(t, err)
 				}
 			} else {
-				assertNoError(t, err)
+				utils.AssertNoError(t, err)
 			}
 		})
 	}
@@ -1164,12 +1168,12 @@ func TestSrvOutbSettings_Validate(t *testing.T) {
 			err := tt.settings.Validate()
 			if tt.wantErr {
 				if tt.errContains != "" {
-					assertErrorContains(t, err, tt.errContains)
+					utils.AssertErrorContains(t, err, tt.errContains)
 				} else {
-					assertError(t, err)
+					utils.AssertError(t, err)
 				}
 			} else {
-				assertNoError(t, err)
+				utils.AssertNoError(t, err)
 			}
 		})
 	}
@@ -1298,12 +1302,12 @@ func TestSrvOutbound_Validate(t *testing.T) {
 			err := tt.outbound.Validate()
 			if tt.wantErr {
 				if tt.errContains != "" {
-					assertErrorContains(t, err, tt.errContains)
+					utils.AssertErrorContains(t, err, tt.errContains)
 				} else {
-					assertError(t, err)
+					utils.AssertError(t, err)
 				}
 			} else {
-				assertNoError(t, err)
+				utils.AssertNoError(t, err)
 			}
 		})
 	}
@@ -1385,12 +1389,12 @@ func TestSrvRoutingRule_Validate(t *testing.T) {
 			err := tt.rule.Validate()
 			if tt.wantErr {
 				if tt.errContains != "" {
-					assertErrorContains(t, err, tt.errContains)
+					utils.AssertErrorContains(t, err, tt.errContains)
 				} else {
-					assertError(t, err)
+					utils.AssertError(t, err)
 				}
 			} else {
-				assertNoError(t, err)
+				utils.AssertNoError(t, err)
 			}
 		})
 	}
@@ -1502,12 +1506,12 @@ func TestSrvRouting_Validate(t *testing.T) {
 			err := tt.routing.Validate()
 			if tt.wantErr {
 				if tt.errContains != "" {
-					assertErrorContains(t, err, tt.errContains)
+					utils.AssertErrorContains(t, err, tt.errContains)
 				} else {
-					assertError(t, err)
+					utils.AssertError(t, err)
 				}
 			} else {
-				assertNoError(t, err)
+				utils.AssertNoError(t, err)
 			}
 		})
 	}
