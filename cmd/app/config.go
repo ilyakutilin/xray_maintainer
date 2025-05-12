@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/ilyakutilin/xray_maintainer/messages"
+	"github.com/ilyakutilin/xray_maintainer/utils"
 	"github.com/knadh/koanf/parsers/yaml"
 	"github.com/knadh/koanf/providers/file"
 	"github.com/knadh/koanf/providers/structs"
@@ -123,7 +124,7 @@ func loadConfig() (*Config, error) {
 		return nil, errors.New("xray server IP should be set")
 	}
 
-	cfg.Workdir, err = expandPath(cfg.Workdir)
+	cfg.Workdir, err = utils.ExpandPath(cfg.Workdir)
 	if err != nil {
 		return nil, fmt.Errorf("error expanding the workdir path: %w", err)
 	}
