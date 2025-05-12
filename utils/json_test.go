@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -151,4 +152,84 @@ func TestParseJSONFile(t *testing.T) {
 			t.Error("parseJSONFile() error = nil, wantErr target must be a non-nil pointer")
 		}
 	})
+}
+
+func TestWriteStructToJSONFile(t *testing.T) {
+	type TestParams struct {
+		Method   string `json:"method"`
+		Password string `json:"password"`
+	}
+
+	type TestConfig struct {
+		Host   string     `json:"host"`
+		Port   int        `json:"port"`
+		Params TestParams `json:"params"`
+	}
+
+	validFilePath, cleanupFn := CreateTempFile(t)
+
+	tests := []struct {
+		name        string
+		cfg         TestConfig
+		filePath    string
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name: "successful write",
+			cfg: TestConfig{
+				Host: "localhost",
+				Port: 8080,
+				Params: TestParams{
+					Method:   "aes-128-gcm",
+					Password: "password123",
+				},
+			},
+			filePath: validFilePath,
+			wantErr:  false,
+		},
+		{
+			name:     "empty struct",
+			cfg:      TestConfig{},
+			filePath: validFilePath,
+			wantErr:  false,
+		},
+		{
+			name:        "nonexistent path",
+			cfg:         TestConfig{},
+			filePath:    "/nonexistent/path/config.json",
+			wantErr:     true,
+			errContains: "error creating file",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Cleanup(cleanupFn)
+			err := WriteStructToJSONFile(tt.cfg, tt.filePath)
+
+			if tt.wantErr {
+				AssertErrorContains(t, err, tt.errContains)
+			} else {
+				AssertNoError(t, err)
+
+				// Read the file back to verify the content
+				fileContent, err := os.ReadFile(tt.filePath)
+				if err != nil {
+					t.Fatalf("failed to read file: %v", err)
+				}
+
+				var result TestConfig
+				err = json.Unmarshal(fileContent, &result)
+				if err != nil {
+					t.Fatalf("failed to unmarshal JSON: %v", err)
+				}
+
+				AssertCorrectString(t, tt.cfg.Host, result.Host)
+				AssertCorrectInt(t, tt.cfg.Port, result.Port)
+				AssertCorrectString(t, tt.cfg.Params.Method, result.Params.Method)
+				AssertCorrectString(t, tt.cfg.Params.Password, result.Params.Password)
+			}
+		})
+	}
 }
