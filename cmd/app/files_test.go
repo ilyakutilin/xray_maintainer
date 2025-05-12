@@ -13,6 +13,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/ilyakutilin/xray_maintainer/utils"
 )
 
 // TODO: Unify cleanups (e.g. RemoveAll vs Remove)
@@ -22,11 +24,11 @@ func TestGetStoredReleaseTag(t *testing.T) {
 	// Versions file does not exist
 	t.Run("Versions file does not exist", func(t *testing.T) {
 		tag, err := getStoredReleaseTag("testfile", "doesnotexist.json")
-		assertCorrectString(t, "", tag)
-		assertNoError(t, err)
+		utils.AssertCorrectString(t, "", tag)
+		utils.AssertNoError(t, err)
 	})
 
-	versionsFile, cleanup := createTempFile(t)
+	versionsFile, cleanup := utils.CreateTempFile(t)
 
 	var tests = []struct {
 		name           string
@@ -69,9 +71,9 @@ func TestGetStoredReleaseTag(t *testing.T) {
 				t.Fatalf("Failed to write test data: %v", err)
 			}
 			tag, err := getStoredReleaseTag("testfile", versionsFile)
-			assertCorrectString(t, test.expectedReturn, tag)
+			utils.AssertCorrectString(t, test.expectedReturn, tag)
 			if test.expectedError == nil {
-				assertNoError(t, err)
+				utils.AssertNoError(t, err)
 			} else {
 				actualErrType := reflect.TypeOf(err)
 				if actualErrType != test.expectedError {
@@ -86,13 +88,13 @@ func TestGetStoredReleaseTag(t *testing.T) {
 func TestUpdateStoredReleaseTag(t *testing.T) {
 	t.Run("Versions file gets created if it does not exist", func(t *testing.T) {
 		err := updateStoredReleaseTag("testfile", "1.2.3", filepath.Join(os.TempDir(), "doesnotexist.json"))
-		assertNoError(t, err)
+		utils.AssertNoError(t, err)
 		data, err := os.ReadFile(filepath.Join(os.TempDir(), "doesnotexist.json"))
-		assertNoError(t, err)
-		assertCorrectString(t, "{\n  \"testfile\": \"1.2.3\"\n}", string(data))
+		utils.AssertNoError(t, err)
+		utils.AssertCorrectString(t, "{\n  \"testfile\": \"1.2.3\"\n}", string(data))
 	})
 
-	versionsFile, cleanup := createTempFile(t)
+	versionsFile, cleanup := utils.CreateTempFile(t)
 
 	var tests = []struct {
 		name            string
@@ -147,16 +149,16 @@ func TestUpdateStoredReleaseTag(t *testing.T) {
 			}
 			err = updateStoredReleaseTag(test.fileName, "1.2.4", versionsFile)
 			if test.errorExpected {
-				assertError(t, err)
+				utils.AssertError(t, err)
 				return
 			} else {
-				assertNoError(t, err)
+				utils.AssertNoError(t, err)
 			}
 			data, err := os.ReadFile(versionsFile)
-			assertNoError(t, err)
+			utils.AssertNoError(t, err)
 			var actualMap map[string]string
 			err = json.Unmarshal(data, &actualMap)
-			assertNoError(t, err)
+			utils.AssertNoError(t, err)
 			if !reflect.DeepEqual(actualMap, test.expectedMap) {
 				t.Errorf("Expected map %v but got %v", test.expectedMap, actualMap)
 			}
@@ -234,7 +236,7 @@ func TestGetLatestReleaseTag(t *testing.T) {
 				return
 			}
 
-			assertCorrectString(t, tt.want, got)
+			utils.AssertCorrectString(t, tt.want, got)
 		})
 	}
 }
@@ -502,7 +504,7 @@ func TestUpdateFile(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			tempFile := createTempFilePath(t)
+			tempFile := utils.CreateTempFilePath(t)
 
 			testApp := &Application{
 				debug:   true,
@@ -527,17 +529,17 @@ func TestUpdateFile(t *testing.T) {
 			err := testApp.updateFile(file)
 
 			if test.errorExpected {
-				assertError(t, err)
+				utils.AssertError(t, err)
 				return
 			} else {
-				assertNoError(t, err)
+				utils.AssertNoError(t, err)
 			}
 
 			content, err := os.ReadFile(tempFile)
 			if err != nil {
 				t.Fatalf("Failed to read file: %v", err)
 			}
-			assertCorrectString(t, "mock content", string(content))
+			utils.AssertCorrectString(t, "mock content", string(content))
 
 			// Check that the versions file is updated
 			versionsFilePath := filepath.Join(filepath.Dir(tempFile), "versions.json")
@@ -552,7 +554,7 @@ func TestUpdateFile(t *testing.T) {
 				t.Fatalf("Failed to unmarshal versions file: %v", err)
 			}
 
-			assertCorrectString(t, "1.2.3", versions[filepath.Base(tempFile)])
+			utils.AssertCorrectString(t, "1.2.3", versions[filepath.Base(tempFile)])
 
 			// Check that there are no zip files in the folder
 			files, err := os.ReadDir(filepath.Dir(tempFile))
@@ -593,8 +595,8 @@ func TestUpdateMultipleFiles(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			tempFileOne := createTempFilePath(t)
-			tempFileTwo := createTempFilePath(t)
+			tempFileOne := utils.CreateTempFilePath(t)
+			tempFileTwo := utils.CreateTempFilePath(t)
 
 			testApp := &Application{
 				debug:   true,
@@ -621,11 +623,11 @@ func TestUpdateMultipleFiles(t *testing.T) {
 			err := testApp.updateMultipleFiles(repos, fn)
 
 			if test.errorExpected {
-				assertError(t, err)
-				assertErrorContains(t, err, "failed to download file\n")
+				utils.AssertError(t, err)
+				utils.AssertErrorContains(t, err, "failed to download file\n")
 				return
 			} else {
-				assertNoError(t, err)
+				utils.AssertNoError(t, err)
 			}
 		})
 	}
