@@ -6,6 +6,7 @@ import (
 	"os"
 	"runtime/debug"
 
+	"github.com/ilyakutilin/xray_maintainer/messages"
 	"github.com/ilyakutilin/xray_maintainer/utils"
 )
 
@@ -38,10 +39,22 @@ func main() {
 
 	// Check if the workdir exists, if not create it
 	if err := utils.EnsureDir(cfg.Workdir); err != nil {
+		cfg.Messages.MainSender.Send(messages.Message{
+			Subject: "Error creating workdir",
+			Body:    fmt.Sprintf("Failed to create workdir %s: %v", cfg.Workdir, err),
+			Errors:  []error{err},
+		})
 		app.logger.Error.Fatalf("Error creating workdir: %v", err)
 	}
 
-	// TODO: Update all the files
+	if err := app.updateMultipleFiles(cfg.Repos, NewFile); err != nil {
+		cfg.Messages.MainSender.Send(messages.Message{
+			Subject: "Error updating files",
+			Body:    fmt.Sprintf("Failed to update the files: %v", err),
+			Errors:  []error{err},
+		})
+		app.logger.Error.Fatalf("Error updating files: %v", err)
+	}
 
 	// TODO: Add error handling
 	// err = app.updateWarp(cfg.Xray)
