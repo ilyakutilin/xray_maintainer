@@ -223,6 +223,7 @@ func (app *Application) updateFile(file File) error {
 		app.logger.Info.Printf("Removing the zip file %s\n", zipFilePath)
 	}
 
+	// TODO: Test executability
 	if file.repo.Executable {
 		app.logger.Info.Printf("Setting executable permissions for %s\n", fileName)
 		if err := utils.MakeExecutable(filePath); err != nil {
