@@ -40,10 +40,10 @@ func main() {
 	// TODO: Update all the files
 
 	// TODO: Add error handling
-	err = app.updateWarp(cfg.Xray)
-	if err != nil {
-		app.logger.Error.Fatalf("Error updating warp config: %v", err)
-	}
+	// err = app.updateWarp(cfg.Xray)
+	// if err != nil {
+	// 	app.logger.Error.Fatalf("Error updating warp config: %v", err)
+	// }
 
 	// // TODO: Add error handling
 	// _ = RestartService("xray")
@@ -53,6 +53,7 @@ func main() {
 	// }
 
 	// TODO: Remove print stmt
-	fmt.Println(cfg.Workdir)
-	fmt.Println(cfg.Xray.Server.IP)
+	// fmt.Println(cfg.Workdir)
+	// fmt.Println(cfg.Xray.Server.IP)
+	fmt.Println(cfg)
 }

@@ -78,7 +78,7 @@ var defaults = Config{
 			Name:           "geosite",
 			ReleaseInfoURL: "https://api.github.com/repos/v2fly/geoip/releases/latest",
 			DownloadURL:    "https://github.com/v2fly/geoip/releases/latest/download/geoip.dat",
-			Filename:       "geoip.dat",
+			Filename:       "geosite.dat",
 		},
 		{
 			Name:           "xray-core",
