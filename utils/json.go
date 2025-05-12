@@ -38,3 +38,25 @@ func ParseJSONFile[T any](jsonFilePath string, target *T, strict bool) error {
 
 	return nil
 }
+
+// WriteStructToJSONFile writes the given data structure to a JSON file at the specified
+// file path. The JSON output is formatted with indentation for readability.
+func WriteStructToJSONFile(data any, filePath string) error {
+	// Create or truncate the file
+	file, err := os.Create(filePath)
+	if err != nil {
+		return fmt.Errorf("error creating file: %v", err)
+	}
+	defer file.Close()
+
+	// Create JSON encoder that writes directly to the file
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "    ") // For pretty-printed JSON
+
+	// Encode the data to JSON and write to file
+	if err := encoder.Encode(data); err != nil {
+		return fmt.Errorf("error encoding JSON: %v", err)
+	}
+
+	return nil
+}
