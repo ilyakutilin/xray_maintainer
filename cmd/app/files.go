@@ -223,6 +223,16 @@ func (app *Application) updateFile(file File) error {
 		app.logger.Info.Printf("Removing the zip file %s\n", zipFilePath)
 	}
 
+	if file.repo.Executable {
+		app.logger.Info.Printf("Setting executable permissions for %s\n", fileName)
+		if err := utils.MakeExecutable(filePath); err != nil {
+			app.logger.Error.Printf("Failed to set executable permissions for %s: %v\n", fileName, err)
+			app.logger.Error.Println("Restoring the backup file...")
+			err = utils.RestoreFile(backup, filePath)
+			return err
+		}
+	}
+
 	if !app.debug {
 		app.logger.Info.Println("Checking operability of xray after the file update...")
 		if err = utils.CheckOperability("xray", nil); err != nil {

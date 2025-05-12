@@ -36,6 +36,7 @@ type Repo struct {
 	ReleaseInfoURL string `koanf:"release_info_url"`
 	DownloadURL    string `koanf:"download_url"`
 	Filename       string `koanf:"filename"`
+	Executable     bool   `koanf:"executable"`
 }
 
 type Messages struct {
@@ -74,24 +75,28 @@ var defaults = Config{
 			ReleaseInfoURL: "https://api.github.com/repos/v2fly/geoip/releases/latest",
 			DownloadURL:    "https://github.com/v2fly/geoip/releases/latest/download/geoip.dat",
 			Filename:       "geoip.dat",
+			Executable:     false,
 		},
 		{
 			Name:           "geosite",
 			ReleaseInfoURL: "https://api.github.com/repos/v2fly/geoip/releases/latest",
 			DownloadURL:    "https://github.com/v2fly/geoip/releases/latest/download/geoip.dat",
 			Filename:       "geosite.dat",
+			Executable:     false,
 		},
 		{
 			Name:           "xray-core",
 			ReleaseInfoURL: "https://api.github.com/repos/XTLS/Xray-core/releases/latest",
 			DownloadURL:    "https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip",
 			Filename:       "xray",
+			Executable:     true,
 		},
 		{
 			Name:           "cf_cred_generator",
 			ReleaseInfoURL: "https://api.github.com/repos/badafans/warp-reg/releases/latest",
 			DownloadURL:    "https://github.com/badafans/warp-reg/releases/latest/download/main-linux-amd64",
 			Filename:       "cf_cred_generator",
+			Executable:     true,
 		},
 	},
 	Messages: Messages{
