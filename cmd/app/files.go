@@ -398,12 +398,21 @@ func (app *Application) updateFile(file File) error {
 }
 
 func (app *Application) updateMultipleFiles(repos []Repo, fileCreator func(repo Repo) File) error {
+	var errs utils.Errors
+
 	for _, repo := range repos {
 		file := fileCreator(repo)
 		err := app.updateFile(file)
 		if err != nil {
-			return err
+			errs.Append(err)
+			app.logger.Error.Printf("Error updating %s: %v\n", repo.Name, err)
 		}
 	}
+
+	if len(errs) > 0 {
+		return errs
+	}
+
+	app.logger.Info.Println("All files have been updated successfully")
 	return nil
 }
