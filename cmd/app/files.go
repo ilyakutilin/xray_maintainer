@@ -396,3 +396,14 @@ func (app *Application) updateFile(file File, debug bool) error {
 
 	return nil
 }
+
+func (app *Application) updateMultipleFiles(repos []Repo, fileCreator func(repo Repo) File) error {
+	for _, repo := range repos {
+		file := fileCreator(repo)
+		err := app.updateFile(file, app.debug)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
