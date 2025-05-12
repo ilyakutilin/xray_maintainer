@@ -5,7 +5,8 @@ import (
 	"log"
 	"os"
 	"runtime/debug"
-	// "github.com/ilyakutilin/xray_maintainer/utils"
+
+	"github.com/ilyakutilin/xray_maintainer/utils"
 )
 
 type Application struct {
@@ -35,7 +36,10 @@ func main() {
 		}
 	}()
 
-	// TODO: Check that the workdir exists, and if not, create it
+	// Check if the workdir exists, if not create it
+	if err := utils.EnsureDir(cfg.Workdir); err != nil {
+		app.logger.Error.Fatalf("Error creating workdir: %v", err)
+	}
 
 	// TODO: Update all the files
 
