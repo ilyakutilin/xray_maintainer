@@ -267,7 +267,7 @@ func TestGetClientConfig(t *testing.T) {
 
 			var xrayServerConfig ServerConfig
 			// By this point parseJSONFile should have already been tested
-			if err := parseJSONFile(serverConfigFile, &xrayServerConfig, true); err != nil {
+			if err := utils.ParseJSONFile(serverConfigFile, &xrayServerConfig, true); err != nil {
 				t.Fatalf("failed to parse server config file: %v", err)
 			}
 

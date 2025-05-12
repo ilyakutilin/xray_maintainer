@@ -64,38 +64,6 @@ func parseCFCreds(output string) (CFCreds, error) {
 	return result, nil
 }
 
-// parseJSONFile reads a JSON file and decodes it into the given target.
-// target must be a non-nil pointer to a struct/map/slice that matches the JSON structure.
-// If strict is true, unknown fields in the JSON file will result in an error.
-// Returns an error if file reading or JSON parsing fails.
-func parseJSONFile[T any](jsonFilePath string, target *T, strict bool) error {
-	if target == nil {
-		return fmt.Errorf("target must be a non-nil pointer")
-	}
-
-	if !utils.FileExists(jsonFilePath) {
-		return fmt.Errorf("file %q does not exist", filepath.Base(jsonFilePath))
-	}
-
-	file, err := os.Open(jsonFilePath)
-	if err != nil {
-		return fmt.Errorf("failed to open JSON file %q: %w", jsonFilePath, err)
-	}
-	defer file.Close()
-
-	decoder := json.NewDecoder(file)
-
-	if strict {
-		decoder.DisallowUnknownFields()
-	}
-
-	if err := decoder.Decode(target); err != nil {
-		return fmt.Errorf("failed to decode JSON from %q: %w", jsonFilePath, err)
-	}
-
-	return nil
-}
-
 func getClientConfig(xrayClient *XrayClient, xrayServerConfig *ServerConfig) *ClientConfig {
 	var clientConfig ClientConfig
 
@@ -170,7 +138,7 @@ func (app *Application) updateWarp(xray Xray) error {
 	// Parse the existing xray config
 	app.logger.Info.Println("Parsing the existing xray config...")
 	var xrayServerConfig ServerConfig
-	if err := parseJSONFile(xray.Server.ConfigPath, &xrayServerConfig, true); err != nil {
+	if err := utils.ParseJSONFile(xray.Server.ConfigPath, &xrayServerConfig, true); err != nil {
 		return fmt.Errorf("error parsing xray server config at path %q: %w", xray.Server.ConfigPath, err)
 	}
 	app.logger.Info.Println("Successfully parsed xray server config...")
