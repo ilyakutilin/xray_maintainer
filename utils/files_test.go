@@ -14,7 +14,7 @@ import (
 // TODO: Unify setups (e.g. create temp subdirs within the temp dir for diff tests)
 
 func TestFileExists(t *testing.T) {
-	tempFile, cleanup := createTempFile(t)
+	tempFile, cleanup := CreateTempFile(t)
 	t.Cleanup(cleanup)
 
 	// Test when file exists
@@ -88,7 +88,7 @@ func TestExpandPath(t *testing.T) {
 			if err != nil {
 				t.Errorf("expandPath returned error: %v", err)
 			}
-			assertCorrectString(t, test.expected, got)
+			AssertCorrectString(t, test.expected, got)
 		})
 	}
 }
@@ -104,31 +104,31 @@ func TestIsZipFile(t *testing.T) {
 			name:     "valid zip file",
 			content:  []byte{0x50, 0x4B, 0x03, 0x04, 0x0A, 0x00, 0x00, 0x00},
 			expected: true,
-			setup:    createTempFilePath,
+			setup:    CreateTempFilePath,
 		},
 		{
 			name:     "empty zip file",
 			content:  []byte{0x50, 0x4B, 0x05, 0x06, 0x00, 0x00, 0x00, 0x00},
 			expected: true,
-			setup:    createTempFilePath,
+			setup:    CreateTempFilePath,
 		},
 		{
 			name:     "not a zip file",
 			content:  []byte("This is not a ZIP file"),
 			expected: false,
-			setup:    createTempFilePath,
+			setup:    CreateTempFilePath,
 		},
 		{
 			name:     "empty file",
 			content:  []byte{},
 			expected: false,
-			setup:    createTempFilePath,
+			setup:    CreateTempFilePath,
 		},
 		{
 			name:     "partial zip signature",
 			content:  []byte{0x50},
 			expected: false,
-			setup:    createTempFilePath,
+			setup:    CreateTempFilePath,
 		},
 		{
 			name:     "non-existent file",
@@ -156,7 +156,7 @@ func TestIsZipFile(t *testing.T) {
 			result, err := IsZipFile(filePath)
 			if test.content == nil {
 				// For non-existent file, we expect an error
-				assertError(t, err)
+				AssertError(t, err)
 				return
 			}
 
@@ -334,12 +334,12 @@ func TestBackupFile(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to read backup file: %v", err)
 		}
-		assertCorrectString(t, "test content", string(content))
+		AssertCorrectString(t, "test content", string(content))
 	})
 
 	t.Run("non-existent file", func(t *testing.T) {
 		_, err := BackupFile("nonexistentfile.txt")
-		assertError(t, err)
+		AssertError(t, err)
 	})
 
 	t.Run("permission denied", func(t *testing.T) {
@@ -362,7 +362,7 @@ func TestBackupFile(t *testing.T) {
 		defer os.Chmod(tmpDir, 0755) // Clean up
 
 		_, err = BackupFile(restrictedFile)
-		assertError(t, err)
+		AssertError(t, err)
 	})
 }
 
@@ -390,7 +390,7 @@ func TestRestoreFile(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to read destination file: %v", err)
 		}
-		assertCorrectString(t, "restore test content", string(content))
+		AssertCorrectString(t, "restore test content", string(content))
 
 		// Verify source file still exists (restore shouldn't delete it)
 		if _, err := os.Stat(srcPath); os.IsNotExist(err) {
@@ -401,7 +401,7 @@ func TestRestoreFile(t *testing.T) {
 	t.Run("non-existent source file", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		err := RestoreFile("nonexistentfile.txt", filepath.Join(tmpDir, "dest.txt"))
-		assertError(t, err)
+		AssertError(t, err)
 	})
 
 	t.Run("unwritable destination", func(t *testing.T) {
@@ -424,7 +424,7 @@ func TestRestoreFile(t *testing.T) {
 		defer os.Chmod(unwritableDir, 0755) // Clean up permissions after test
 
 		err = RestoreFile(srcPath, filepath.Join(unwritableDir, "dest.txt"))
-		assertError(t, err)
+		AssertError(t, err)
 	})
 
 	t.Run("destination directory doesn't exist", func(t *testing.T) {
@@ -437,6 +437,6 @@ func TestRestoreFile(t *testing.T) {
 
 		nonexistentDir := filepath.Join(tmpDir, "nonexistent")
 		err = RestoreFile(srcPath, filepath.Join(nonexistentDir, "dest.txt"))
-		assertError(t, err)
+		AssertError(t, err)
 	})
 }
