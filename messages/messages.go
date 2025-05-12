@@ -14,7 +14,7 @@ type Sender interface {
 }
 
 type CompositeSender struct {
-	senders []Sender
+	Senders []Sender
 }
 
 // Send attempts to send the provided message using all the senders in the
@@ -27,7 +27,7 @@ type CompositeSender struct {
 // occurred, or nil if the message was successfully sent by all valid senders.
 func (c *CompositeSender) Send(msg Message) error {
 	var errs utils.Errors
-	for _, s := range c.senders {
+	for _, s := range c.Senders {
 		if err := s.Validate(); err != nil {
 			errs = append(errs, err)
 			continue
@@ -48,7 +48,7 @@ func (c *CompositeSender) Send(msg Message) error {
 // errors if any occurred, or nil if all senders are valid.
 func (c *CompositeSender) Validate() error {
 	var errs utils.Errors
-	for _, s := range c.senders {
+	for _, s := range c.Senders {
 		if err := s.Validate(); err != nil {
 			errs = append(errs, err)
 		}

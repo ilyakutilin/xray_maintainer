@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/ilyakutilin/xray_maintainer/messages"
 	"github.com/knadh/koanf/parsers/yaml"
 	"github.com/knadh/koanf/providers/file"
 	"github.com/knadh/koanf/providers/structs"
@@ -42,12 +43,20 @@ type Repos struct {
 	CFCredGenerator Repo `koanf:"cf_cred_generator"`
 }
 
+type Messages struct {
+	EmailSender    messages.EmailSender    `koanf:"email"`
+	TelegramSender messages.TelegramSender `koanf:"telegram"`
+	StreamSender   messages.StreamSender
+	MainSender     messages.CompositeSender
+}
+
 type Config struct {
-	Debug        bool   `koanf:"debug"`
-	Workdir      string `koanf:"workdir"`
-	Xray         Xray   `koanf:"xray"`
-	Repos        Repos  `koanf:"repos"`
-	IPCheckerURL string `koanf:"ip_checker_url"`
+	Debug        bool     `koanf:"debug"`
+	Workdir      string   `koanf:"workdir"`
+	Xray         Xray     `koanf:"xray"`
+	Repos        Repos    `koanf:"repos"`
+	Messages     Messages `koanf:"messages"`
+	IPCheckerURL string   `koanf:"ip_checker_url"`
 }
 
 var defaults = Config{
@@ -86,6 +95,11 @@ var defaults = Config{
 			Filename:       "cf_cred_generator",
 		},
 	},
+	Messages: Messages{
+		// EmailSender and TelegramSender settings shall be provided by the user in full
+		// StreamSender has no settings
+		StreamSender: messages.StreamSender{},
+	},
 	IPCheckerURL: "http://ip-api.com/json/",
 }
 
@@ -117,6 +131,24 @@ func loadConfig() (*Config, error) {
 	}
 
 	cfg.Xray.Server.ConfigPath = filepath.Join(cfg.Workdir, cfg.Xray.Server.ConfigFilename)
+
+	rawSenders := []messages.Sender{
+		&cfg.Messages.EmailSender,
+		&cfg.Messages.TelegramSender,
+	}
+
+	var validSenders []messages.Sender
+
+	for _, sender := range rawSenders {
+		if err := sender.Validate(); err != nil {
+			return nil, fmt.Errorf("the sender failed validation and will not be "+
+				"included in the senders list: %w", err)
+		}
+		validSenders = append(validSenders, sender)
+	}
+	cfg.Messages.MainSender = messages.CompositeSender{
+		Senders: validSenders,
+	}
 
 	return cfg, nil
 }

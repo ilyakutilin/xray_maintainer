@@ -27,4 +27,10 @@ repos:
     download_url: 'https://github.com/badafans/warp-reg/releases/latest/download/main-linux-amd64'
     filename: cf_cred_generator
 
+messages:
+  email:
+    # TODO: Add actual settings
+  telegram:
+    # TODO: Add actual settings
+
 ip_checker_url: 'http://ip-api.com/json/'
