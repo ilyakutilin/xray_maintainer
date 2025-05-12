@@ -1,10 +1,8 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -150,31 +148,15 @@ func (app *Application) updateWarp(xray Xray) error {
 	// Get the client config and verify that warp is active
 	clientConfig := getClientConfig(&xray.Client, &xrayServerConfig)
 
+	clientConfigFilePath := filepath.Join(app.workdir, "client_config.json")
+	if err := utils.WriteStructToJSONFile(clientConfig, clientConfigFilePath); err != nil {
+		return fmt.Errorf("error writing client config to %q: %w", clientConfigFilePath, err)
+	}
+	app.logger.Info.Println("Successfully wrote client config to file.")
+
 	// TODO: Everything below is temporary for checking
 	// You actually need to download the CF cred generator, launch it, parse the output,
 	// write new values to the struct, and then write the struct to the json
-
-	fmt.Println(clientConfig)
-
-	for _, outbound := range xrayServerConfig.Outbounds {
-		if outbound.Protocol == "wireguard" {
-			outbound.Settings.SecretKey = "SOMEVERYSECURESECRETKEY"
-		}
-	}
-
-	// Open file for writing (or create if it doesn’t exist)
-	file, err := os.Create(filepath.Join(filepath.Dir(xray.Server.ConfigPath), "updated.json"))
-	if err != nil {
-		return fmt.Errorf("error creating file: %w", err)
-	}
-	defer file.Close()
-
-	// Create a JSON encoder and write to file
-	encoder := json.NewEncoder(file)
-	encoder.SetIndent("", "  ") // Pretty print JSON
-	if err := encoder.Encode(xrayServerConfig); err != nil {
-		return fmt.Errorf("error encoding JSON: %w", err)
-	}
 
 	return nil
 }
