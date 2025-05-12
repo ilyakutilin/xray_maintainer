@@ -1,10 +1,8 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -62,38 +60,6 @@ func parseCFCreds(output string) (CFCreds, error) {
 	}
 
 	return result, nil
-}
-
-// parseJSONFile reads a JSON file and decodes it into the given target.
-// target must be a non-nil pointer to a struct/map/slice that matches the JSON structure.
-// If strict is true, unknown fields in the JSON file will result in an error.
-// Returns an error if file reading or JSON parsing fails.
-func parseJSONFile[T any](jsonFilePath string, target *T, strict bool) error {
-	if target == nil {
-		return fmt.Errorf("target must be a non-nil pointer")
-	}
-
-	if !utils.FileExists(jsonFilePath) {
-		return fmt.Errorf("file %q does not exist", filepath.Base(jsonFilePath))
-	}
-
-	file, err := os.Open(jsonFilePath)
-	if err != nil {
-		return fmt.Errorf("failed to open JSON file %q: %w", jsonFilePath, err)
-	}
-	defer file.Close()
-
-	decoder := json.NewDecoder(file)
-
-	if strict {
-		decoder.DisallowUnknownFields()
-	}
-
-	if err := decoder.Decode(target); err != nil {
-		return fmt.Errorf("failed to decode JSON from %q: %w", jsonFilePath, err)
-	}
-
-	return nil
 }
 
 func getClientConfig(xrayClient *XrayClient, xrayServerConfig *ServerConfig) *ClientConfig {
@@ -170,7 +136,7 @@ func (app *Application) updateWarp(xray Xray) error {
 	// Parse the existing xray config
 	app.logger.Info.Println("Parsing the existing xray config...")
 	var xrayServerConfig ServerConfig
-	if err := parseJSONFile(xray.Server.ConfigPath, &xrayServerConfig, true); err != nil {
+	if err := utils.ParseJSONFile(xray.Server.ConfigPath, &xrayServerConfig, true); err != nil {
 		return fmt.Errorf("error parsing xray server config at path %q: %w", xray.Server.ConfigPath, err)
 	}
 	app.logger.Info.Println("Successfully parsed xray server config...")
@@ -182,31 +148,15 @@ func (app *Application) updateWarp(xray Xray) error {
 	// Get the client config and verify that warp is active
 	clientConfig := getClientConfig(&xray.Client, &xrayServerConfig)
 
+	clientConfigFilePath := filepath.Join(app.workdir, "client_config.json")
+	if err := utils.WriteStructToJSONFile(clientConfig, clientConfigFilePath); err != nil {
+		return fmt.Errorf("error writing client config to %q: %w", clientConfigFilePath, err)
+	}
+	app.logger.Info.Println("Successfully wrote client config to file.")
+
 	// TODO: Everything below is temporary for checking
 	// You actually need to download the CF cred generator, launch it, parse the output,
 	// write new values to the struct, and then write the struct to the json
-
-	fmt.Println(clientConfig)
-
-	for _, outbound := range xrayServerConfig.Outbounds {
-		if outbound.Protocol == "wireguard" {
-			outbound.Settings.SecretKey = "SOMEVERYSECURESECRETKEY"
-		}
-	}
-
-	// Open file for writing (or create if it doesn’t exist)
-	file, err := os.Create(filepath.Join(filepath.Dir(xray.Server.ConfigPath), "updated.json"))
-	if err != nil {
-		return fmt.Errorf("error creating file: %w", err)
-	}
-	defer file.Close()
-
-	// Create a JSON encoder and write to file
-	encoder := json.NewEncoder(file)
-	encoder.SetIndent("", "  ") // Pretty print JSON
-	if err := encoder.Encode(xrayServerConfig); err != nil {
-		return fmt.Errorf("error encoding JSON: %w", err)
-	}
 
 	return nil
 }
