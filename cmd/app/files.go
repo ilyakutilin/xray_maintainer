@@ -307,7 +307,7 @@ func restoreFile(src, dst string) error {
 // Checks if the version of the file by the specified fullPath (including the filename)
 // can be updated to a newer version based on the latest release version from Github.
 // Updates the file if necessary.
-func (app *Application) updateFile(file File, debug bool) error {
+func (app *Application) updateFile(file File) error {
 	fileName := file.repo.Filename
 	fileDir := app.workdir
 	filePath := filepath.Join(fileDir, fileName)
@@ -377,7 +377,7 @@ func (app *Application) updateFile(file File, debug bool) error {
 		app.logger.Info.Printf("Removing the zip file %s\n", zipFilePath)
 	}
 
-	if !debug {
+	if !app.debug {
 		app.logger.Info.Println("Checking operability of xray after the file update...")
 		if err = utils.CheckOperability("xray", nil); err != nil {
 			app.logger.Error.Printf("Something went wrong with the %s file update, restoring the backup file...\n", fileName)
@@ -400,7 +400,7 @@ func (app *Application) updateFile(file File, debug bool) error {
 func (app *Application) updateMultipleFiles(repos []Repo, fileCreator func(repo Repo) File) error {
 	for _, repo := range repos {
 		file := fileCreator(repo)
-		err := app.updateFile(file, app.debug)
+		err := app.updateFile(file)
 		if err != nil {
 			return err
 		}

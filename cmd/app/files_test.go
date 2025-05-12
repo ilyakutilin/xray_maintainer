@@ -953,7 +953,7 @@ func TestUpdateFile(t *testing.T) {
 			file.releaseChecker = test.releaseChecker
 			file.downloader = test.downloader
 
-			err := testApp.updateFile(file, true)
+			err := testApp.updateFile(file)
 
 			if test.errorExpected {
 				assertError(t, err)
