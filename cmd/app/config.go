@@ -31,16 +31,10 @@ type Xray struct {
 }
 
 type Repo struct {
+	Name           string `koanf:"name"`
 	ReleaseInfoURL string `koanf:"release_info_url"`
 	DownloadURL    string `koanf:"download_url"`
 	Filename       string `koanf:"filename"`
-}
-
-type Repos struct {
-	Geoip           Repo `koanf:"geoip"`
-	Geosite         Repo `koanf:"geosite"`
-	XrayCore        Repo `koanf:"xray_core"`
-	CFCredGenerator Repo `koanf:"cf_cred_generator"`
 }
 
 type Messages struct {
@@ -54,7 +48,7 @@ type Config struct {
 	Debug        bool     `koanf:"debug"`
 	Workdir      string   `koanf:"workdir"`
 	Xray         Xray     `koanf:"xray"`
-	Repos        Repos    `koanf:"repos"`
+	Repos        []Repo   `koanf:"repos"`
 	Messages     Messages `koanf:"messages"`
 	IPCheckerURL string   `koanf:"ip_checker_url"`
 }
@@ -73,23 +67,27 @@ var defaults = Config{
 			Port:           10801,
 		},
 	},
-	Repos: Repos{
-		Geoip: Repo{
+	Repos: []Repo{
+		{
+			Name:           "geoip",
 			ReleaseInfoURL: "https://api.github.com/repos/v2fly/geoip/releases/latest",
 			DownloadURL:    "https://github.com/v2fly/geoip/releases/latest/download/geoip.dat",
 			Filename:       "geoip.dat",
 		},
-		Geosite: Repo{
-			ReleaseInfoURL: "https://api.github.com/repos/v2fly/domain-list-community/releases/latest",
-			DownloadURL:    "https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat",
+		{
+			Name:           "geosite",
+			ReleaseInfoURL: "https://api.github.com/repos/v2fly/geoip/releases/latest",
+			DownloadURL:    "https://github.com/v2fly/geoip/releases/latest/download/geoip.dat",
 			Filename:       "geosite.dat",
 		},
-		XrayCore: Repo{
+		{
+			Name:           "xray-core",
 			ReleaseInfoURL: "https://api.github.com/repos/XTLS/Xray-core/releases/latest",
 			DownloadURL:    "https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip",
 			Filename:       "xray",
 		},
-		CFCredGenerator: Repo{
+		{
+			Name:           "cf_cred_generator",
 			ReleaseInfoURL: "https://api.github.com/repos/badafans/warp-reg/releases/latest",
 			DownloadURL:    "https://github.com/badafans/warp-reg/releases/latest/download/main-linux-amd64",
 			Filename:       "cf_cred_generator",

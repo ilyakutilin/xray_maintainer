@@ -953,7 +953,7 @@ func TestUpdateFile(t *testing.T) {
 			file.releaseChecker = test.releaseChecker
 			file.downloader = test.downloader
 
-			err := testApp.updateFile(file, true)
+			err := testApp.updateFile(file)
 
 			if test.errorExpected {
 				assertError(t, err)
@@ -997,4 +997,65 @@ func TestUpdateFile(t *testing.T) {
 		})
 	}
 
+}
+
+func TestUpdateMultipleFiles(t *testing.T) {
+	tests := []struct {
+		name           string
+		ReleaseChecker ReleaseChecker
+		downloader     FileDownloader
+		errorExpected  bool
+	}{
+		{
+			name:           "Successful update",
+			ReleaseChecker: MockReleaseChecker{},
+			downloader:     OrdinaryFileDownloader{},
+			errorExpected:  false,
+		},
+		{
+			name:           "Failed update",
+			ReleaseChecker: MockReleaseChecker{},
+			downloader:     FailFileDownloader{},
+			errorExpected:  true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tempFileOne := createTempFilePath(t)
+			tempFileTwo := createTempFilePath(t)
+
+			testApp := &Application{
+				debug:   true,
+				logger:  GetLogger(false),
+				workdir: filepath.Dir(tempFileOne),
+			}
+
+			fn := func(repo Repo) File {
+				return File{
+					repo:           repo,
+					releaseChecker: test.ReleaseChecker,
+					downloader:     test.downloader,
+				}
+			}
+
+			filenameOne := filepath.Base(tempFileOne)
+			filenameTwo := filepath.Base(tempFileTwo)
+
+			repos := []Repo{
+				{Name: filenameOne, Filename: filenameOne},
+				{Name: filenameTwo, Filename: filenameTwo},
+			}
+
+			err := testApp.updateMultipleFiles(repos, fn)
+
+			if test.errorExpected {
+				assertError(t, err)
+				assertErrorContains(t, err, "failed to download file\n")
+				return
+			} else {
+				assertNoError(t, err)
+			}
+		})
+	}
 }

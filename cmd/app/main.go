@@ -37,23 +37,13 @@ func main() {
 
 	// TODO: Check that the workdir exists, and if not, create it
 
-	xrayExecutable := NewFile(cfg.Repos.XrayCore)
-	// TODO: Add error handling
-	_ = app.updateFile(xrayExecutable, cfg.Debug)
-
-	geoipFile := NewFile(cfg.Repos.Geoip)
-	// TODO: Add error handling
-	_ = app.updateFile(geoipFile, cfg.Debug)
-
-	geositeFile := NewFile(cfg.Repos.Geosite)
-	// TODO: Add error handling
-	_ = app.updateFile(geositeFile, cfg.Debug)
+	// TODO: Update all the files
 
 	// TODO: Add error handling
-	err = app.updateWarp(cfg.Xray)
-	if err != nil {
-		app.logger.Error.Fatalf("Error updating warp config: %v", err)
-	}
+	// err = app.updateWarp(cfg.Xray)
+	// if err != nil {
+	// 	app.logger.Error.Fatalf("Error updating warp config: %v", err)
+	// }
 
 	// // TODO: Add error handling
 	// _ = RestartService("xray")
@@ -63,7 +53,7 @@ func main() {
 	// }
 
 	// TODO: Remove print stmt
-	fmt.Println(cfg.Workdir)
-	fmt.Println(cfg.Xray.Server.IP)
-	fmt.Println(xrayExecutable)
+	// fmt.Println(cfg.Workdir)
+	// fmt.Println(cfg.Xray.Server.IP)
+	fmt.Println(cfg)
 }
