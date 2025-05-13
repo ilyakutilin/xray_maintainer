@@ -1,11 +1,16 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
+	"context"
 	"errors"
 	"fmt"
-	"path/filepath"
+	"os/exec"
 	"regexp"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/ilyakutilin/xray_maintainer/utils"
 )
@@ -130,16 +135,86 @@ func getClientConfig(xrayClient *XrayClient, xrayServerConfig *ServerConfig) *Cl
 	return &clientConfig
 }
 
-func (app *Application) updateWarp(xray Xray) error {
+func (app *Application) getWarpStatus(ctx context.Context, xray Xray) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, xray.ExecutableFilePath, "-c", xray.Client.ConfigFilePath)
+
+	stdoutPipe, err := cmd.StdoutPipe()
+	if err != nil {
+		return "", fmt.Errorf("failed to get stdout pipe for the xray verification client process: %w", err)
+	}
+
+	if err := cmd.Start(); err != nil {
+		return "", fmt.Errorf("failed to start the xray verification client process: %w", err)
+	}
+
+	stdoutBuf := new(bytes.Buffer)
+	stdoutScanner := bufio.NewScanner(stdoutPipe)
+
+	ready := make(chan struct{})
+
+	go func() {
+		for stdoutScanner.Scan() {
+			line := stdoutScanner.Text()
+			fmt.Println("xray:", line)
+			stdoutBuf.WriteString(line + "\n")
+
+			if strings.Contains(line, "Failed to start:") {
+				close(ready)
+				return
+			}
+			if strings.Contains(line, "Reading config:") {
+				close(ready)
+				return
+			}
+		}
+	}()
+
+	select {
+	case <-ready:
+	case <-ctx.Done():
+		return "", errors.New("timeout waiting for the xray verification client startup")
+	}
+
+	output := stdoutBuf.String()
+
+	if strings.Contains(output, "Failed to start:") {
+		_ = cmd.Process.Kill()
+		return "", fmt.Errorf("xray verification client failed to start: %v", output)
+	}
+
+	app.logger.Info.Println("xray started successfully. Performing IP info request...")
+
+	apiResponse, err := utils.GetRequest(ctx, xray.Client.IPCheckerURL)
+	if err != nil {
+		_ = cmd.Process.Signal(syscall.SIGTERM)
+		_ = cmd.Wait()
+		return "", fmt.Errorf("failed to fetch the warp status JSON from the ip checker API: %w", err)
+	}
+
+	app.logger.Info.Println("sending SIGTERM to the xray verification client...")
+	if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
+		return "", fmt.Errorf("failed to send SIGTERM: %w", err)
+	}
+	if err := cmd.Wait(); err != nil {
+		return "", fmt.Errorf("xray verification client exited with error: %w", err)
+	}
+
+	return apiResponse, nil
+}
+
+func (app *Application) updateWarp(ctx context.Context, xray Xray) error {
 	app.logger.Info.Println("Updating warp config...")
 
-	// Parse the existing xray config
-	app.logger.Info.Println("Parsing the existing xray config...")
+	// Parse the existing xray server config
+	app.logger.Info.Println("Parsing the existing xray server config...")
 	var xrayServerConfig ServerConfig
-	if err := utils.ParseJSONFile(xray.Server.ConfigPath, &xrayServerConfig, true); err != nil {
-		return fmt.Errorf("error parsing xray server config at path %q: %w", xray.Server.ConfigPath, err)
+	if err := utils.ParseJSONFile(xray.Server.ConfigFilePath, &xrayServerConfig, true); err != nil {
+		return fmt.Errorf("error parsing xray server config at path %q: %w", xray.Server.ConfigFilePath, err)
 	}
-	app.logger.Info.Println("Successfully parsed xray server config...")
+	app.logger.Info.Println("Successfully parsed xray server config.")
 
 	if err := xrayServerConfig.Validate(); err != nil {
 		return fmt.Errorf("the parsed xray server config failed validation: %w", err)
@@ -147,12 +222,15 @@ func (app *Application) updateWarp(xray Xray) error {
 
 	// Get the client config and verify that warp is active
 	clientConfig := getClientConfig(&xray.Client, &xrayServerConfig)
-
-	clientConfigFilePath := filepath.Join(app.workdir, "client_config.json")
-	if err := utils.WriteStructToJSONFile(clientConfig, clientConfigFilePath); err != nil {
-		return fmt.Errorf("error writing client config to %q: %w", clientConfigFilePath, err)
+	if err := utils.WriteStructToJSONFile(clientConfig, xray.Client.ConfigFilePath); err != nil {
+		return fmt.Errorf("error writing client config to %q: %w", xray.Client.ConfigFilePath, err)
 	}
 	app.logger.Info.Println("Successfully wrote client config to file.")
+	app.logger.Info.Println("Starting to check if the warp is active and responsive...")
+	_, err := app.getWarpStatus(ctx, xray)
+	if err != nil {
+		return fmt.Errorf("failed to obtain the warp status: %w", err)
+	}
 
 	// TODO: Everything below is temporary for checking
 	// You actually need to download the CF cred generator, launch it, parse the output,

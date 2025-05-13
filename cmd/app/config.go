@@ -22,7 +22,8 @@ type XrayClient struct {
 	// Only shadowsocks is supported so the value is not taken from yaml, it is always
 	// taken from the defaults
 	ServerProtocol string
-	Port           int `koanf:"port"`
+	Port           int    `koanf:"port"`
+	IPCheckerURL   string `koanf:"ip_checker_url"`
 	ConfigFilePath string
 }
 
@@ -48,12 +49,11 @@ type Messages struct {
 }
 
 type Config struct {
-	Debug        bool     `koanf:"debug"`
-	Workdir      string   `koanf:"workdir"`
-	Xray         Xray     `koanf:"xray"`
-	Repos        []Repo   `koanf:"repos"`
-	Messages     Messages `koanf:"messages"`
-	IPCheckerURL string   `koanf:"ip_checker_url"`
+	Debug    bool     `koanf:"debug"`
+	Workdir  string   `koanf:"workdir"`
+	Xray     Xray     `koanf:"xray"`
+	Repos    []Repo   `koanf:"repos"`
+	Messages Messages `koanf:"messages"`
 }
 
 var defaults = Config{
@@ -67,6 +67,7 @@ var defaults = Config{
 		Client: XrayClient{
 			ServerProtocol: "shadowsocks",
 			Port:           10801,
+			IPCheckerURL:   "http://ip-api.com/json/?fields=status,message,isp,org,query",
 		},
 	},
 	Repos: []Repo{
@@ -104,7 +105,6 @@ var defaults = Config{
 		// StreamSender has no settings
 		StreamSender: messages.StreamSender{},
 	},
-	IPCheckerURL: "http://ip-api.com/json/",
 }
 
 // Loads configuration

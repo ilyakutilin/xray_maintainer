@@ -7,6 +7,7 @@ xray:
     ip: 123.234.123.234
   client:
     port: 10801
+    ip_checker_url: 'http://ip-api.com/json/?fields=status,message,isp,org,query'
 
 repos:
   - name: geoip
@@ -35,5 +36,3 @@ messages:
     # TODO: Add actual settings
   telegram:
     # TODO: Add actual settings
-
-ip_checker_url: 'http://ip-api.com/json/'
