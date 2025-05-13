@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -56,11 +57,14 @@ func main() {
 		app.logger.Error.Fatalf("Error updating files: %v", err)
 	}
 
+	ctx := context.Background()
 	// TODO: Add error handling
-	// err = app.updateWarp(cfg.Xray)
-	// if err != nil {
-	// 	app.logger.Error.Fatalf("Error updating warp config: %v", err)
-	// }
+	if !app.debug {
+		err = app.updateWarp(ctx, cfg.Xray)
+		if err != nil {
+			app.logger.Error.Fatalf("Error updating warp config: %v", err)
+		}
+	}
 
 	// // TODO: Add error handling
 	// _ = RestartService("xray")

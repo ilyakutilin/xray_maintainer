@@ -205,6 +205,41 @@ func (app *Application) getWarpStatus(ctx context.Context, xray Xray) ([]byte, e
 	return apiResponse, nil
 }
 
+func checkWarpStatus(ipCheckerResponseJSON []byte, xrayServerIP string) error {
+	type IPCheckerResponse struct {
+		Status  string `json:"status"`
+		Message string `json:"message"`
+		ISP     string `json:"isp"`
+		Org     string `json:"org"`
+		Query   string `json:"query"`
+	}
+
+	var r IPCheckerResponse
+
+	if err := utils.ParseJSON(ipCheckerResponseJSON, &r, false); err != nil {
+		return fmt.Errorf("could not parse the JSON response provided by the ip "+
+			"checker into a struct: %w", err)
+	}
+
+	if r.Status != "success" {
+		return fmt.Errorf("the ip checker failed to get the ISP/Org status for IP %s "+
+			"and provided the following message: %s", r.Query, r.Message)
+	}
+
+	if r.Query == xrayServerIP {
+		return fmt.Errorf("ip address detected by the ip checker is %s which is "+
+			"the address of the xray server machine, which means that Warp is not "+
+			"active", r.Query)
+	}
+
+	if !strings.Contains(strings.ToLower(r.ISP), "cloudflare") || !strings.Contains(strings.ToLower(r.Org), "cloudflare") {
+		return fmt.Errorf("ip checker could not detect Cloudflare in ISP or Org "+
+			"which means that Warp is not active. ISP: %s; Org: %s", r.ISP, r.Org)
+	}
+
+	return nil
+}
+
 func (app *Application) updateWarp(ctx context.Context, xray Xray) error {
 	app.logger.Info.Println("Updating warp config...")
 
@@ -227,9 +262,13 @@ func (app *Application) updateWarp(ctx context.Context, xray Xray) error {
 	}
 	app.logger.Info.Println("Successfully wrote client config to file.")
 	app.logger.Info.Println("Starting to check if the warp is active and responsive...")
-	_, err := app.getWarpStatus(ctx, xray)
+	ipCheckerResponse, err := app.getWarpStatus(ctx, xray)
 	if err != nil {
 		return fmt.Errorf("failed to obtain the warp status: %w", err)
+	}
+	if err := checkWarpStatus(ipCheckerResponse, xray.Server.IP); err == nil {
+		app.logger.Info.Println("Warp is active, so its update is not required.")
+		return nil
 	}
 
 	// TODO: Everything below is temporary for checking
