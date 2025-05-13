@@ -15,8 +15,7 @@ import (
 
 type XrayServer struct {
 	IP             string `koanf:"ip"`
-	ConfigFilename string `koanf:"config_filename"`
-	ConfigPath     string
+	ConfigFilePath string
 }
 
 type XrayClient struct {
@@ -24,11 +23,13 @@ type XrayClient struct {
 	// taken from the defaults
 	ServerProtocol string
 	Port           int `koanf:"port"`
+	ConfigFilePath string
 }
 
 type Xray struct {
-	Server XrayServer `koanf:"server"`
-	Client XrayClient `koanf:"client"`
+	Server             XrayServer `koanf:"server"`
+	Client             XrayClient `koanf:"client"`
+	ExecutableFilePath string
 }
 
 type Repo struct {
@@ -61,8 +62,7 @@ var defaults = Config{
 	Xray: Xray{
 		Server: XrayServer{
 			// No default for Server IP as it shall be explicitly set by the user
-			IP:             "",
-			ConfigFilename: "config.json",
+			IP: "",
 		},
 		Client: XrayClient{
 			ServerProtocol: "shadowsocks",
@@ -134,7 +134,21 @@ func loadConfig() (*Config, error) {
 		return nil, fmt.Errorf("error expanding the workdir path: %w", err)
 	}
 
-	cfg.Xray.Server.ConfigPath = filepath.Join(cfg.Workdir, cfg.Xray.Server.ConfigFilename)
+	cfg.Xray.Server.ConfigFilePath = filepath.Join(cfg.Workdir, "server-config.json")
+	cfg.Xray.Client.ConfigFilePath = filepath.Join(cfg.Workdir, "client-config.json")
+
+	var xrayExecutableFileName string
+	for _, repo := range cfg.Repos {
+		if repo.Name == "xray_core" {
+			xrayExecutableFileName = repo.Filename
+		}
+	}
+	if xrayExecutableFileName == "" {
+		return nil, errors.New("the name for the xray core executable has not " +
+			"been set in the config. Please set the filename for the xray " +
+			"executable")
+	}
+	cfg.Xray.ExecutableFilePath = filepath.Join(cfg.Workdir, xrayExecutableFileName)
 
 	rawSenders := []messages.Sender{
 		&cfg.Messages.EmailSender,

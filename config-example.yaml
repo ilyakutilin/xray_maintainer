@@ -5,7 +5,6 @@ workdir: /opt/xray/
 xray:
   server:
     ip: 123.234.123.234
-    config_filename: config.json
   client:
     port: 10801
 
