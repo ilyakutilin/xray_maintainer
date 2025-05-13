@@ -135,7 +135,7 @@ func getClientConfig(xrayClient *XrayClient, xrayServerConfig *ServerConfig) *Cl
 	return &clientConfig
 }
 
-func (app *Application) getWarpStatus(ctx context.Context, xray Xray) (string, error) {
+func (app *Application) getWarpStatus(ctx context.Context, xray Xray) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
@@ -143,11 +143,11 @@ func (app *Application) getWarpStatus(ctx context.Context, xray Xray) (string, e
 
 	stdoutPipe, err := cmd.StdoutPipe()
 	if err != nil {
-		return "", fmt.Errorf("failed to get stdout pipe for the xray verification client process: %w", err)
+		return nil, fmt.Errorf("failed to get stdout pipe for the xray verification client process: %w", err)
 	}
 
 	if err := cmd.Start(); err != nil {
-		return "", fmt.Errorf("failed to start the xray verification client process: %w", err)
+		return nil, fmt.Errorf("failed to start the xray verification client process: %w", err)
 	}
 
 	stdoutBuf := new(bytes.Buffer)
@@ -175,14 +175,14 @@ func (app *Application) getWarpStatus(ctx context.Context, xray Xray) (string, e
 	select {
 	case <-ready:
 	case <-ctx.Done():
-		return "", errors.New("timeout waiting for the xray verification client startup")
+		return nil, errors.New("timeout waiting for the xray verification client startup")
 	}
 
 	output := stdoutBuf.String()
 
 	if strings.Contains(output, "Failed to start:") {
 		_ = cmd.Process.Kill()
-		return "", fmt.Errorf("xray verification client failed to start: %v", output)
+		return nil, fmt.Errorf("xray verification client failed to start: %v", output)
 	}
 
 	app.logger.Info.Println("xray started successfully. Performing IP info request...")
@@ -191,15 +191,15 @@ func (app *Application) getWarpStatus(ctx context.Context, xray Xray) (string, e
 	if err != nil {
 		_ = cmd.Process.Signal(syscall.SIGTERM)
 		_ = cmd.Wait()
-		return "", fmt.Errorf("failed to fetch the warp status JSON from the ip checker API: %w", err)
+		return nil, fmt.Errorf("failed to fetch the warp status JSON from the ip checker API: %w", err)
 	}
 
 	app.logger.Info.Println("sending SIGTERM to the xray verification client...")
 	if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
-		return "", fmt.Errorf("failed to send SIGTERM: %w", err)
+		return nil, fmt.Errorf("failed to send SIGTERM: %w", err)
 	}
 	if err := cmd.Wait(); err != nil {
-		return "", fmt.Errorf("xray verification client exited with error: %w", err)
+		return nil, fmt.Errorf("xray verification client exited with error: %w", err)
 	}
 
 	return apiResponse, nil

@@ -22,7 +22,7 @@ func TestGetRequest_Success(t *testing.T) {
 
 	AssertNoError(t, err)
 
-	AssertCorrectString(t, body, "test response")
+	AssertCorrectString(t, string(body), "test response")
 }
 
 func TestGetRequest_Non200Status(t *testing.T) {
