@@ -1,13 +1,34 @@
 package utils
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 )
 
-// parseJSONFile reads a JSON file and decodes it into the given target.
+// ParseJSON unmarshals JSON bytes into a target struct with optional strict mode
+func ParseJSON[T any](jsonBytes []byte, target *T, strict bool) error {
+	if target == nil {
+		return fmt.Errorf("target must be a non-nil pointer")
+	}
+
+	dec := json.NewDecoder(bytes.NewReader(jsonBytes))
+
+	if strict {
+		dec.DisallowUnknownFields()
+	}
+
+	err := dec.Decode(target)
+	if err != nil {
+		return fmt.Errorf("failed to parse JSON: %w", err)
+	}
+	return nil
+}
+
+// TODO: ParseJSONFile shall use ParseJSON above, and the testing shall be split accordingly
+// ParseJSONFile reads a JSON file and decodes it into the given target.
 // target must be a non-nil pointer to a struct/map/slice that matches the JSON structure.
 // If strict is true, unknown fields in the JSON file will result in an error.
 // Returns an error if file reading or JSON parsing fails.
