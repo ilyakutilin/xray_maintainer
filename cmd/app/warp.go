@@ -1,15 +1,11 @@
 package main
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"os/exec"
 	"regexp"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/ilyakutilin/xray_maintainer/utils"
@@ -140,68 +136,30 @@ func (app *Application) getWarpStatus(ctx context.Context, xray Xray) ([]byte, e
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, xray.ExecutableFilePath, "-c", xray.Client.ConfigFilePath)
-
-	stdoutPipe, err := cmd.StdoutPipe()
+	cmd, stdout, err := startXrayClient(ctx, xray)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get stdout pipe for the xray verification client process: %w", err)
+		return nil, err
 	}
-
-	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("failed to start the xray verification client process: %w", err)
-	}
-
-	stdoutBuf := new(bytes.Buffer)
-	stdoutScanner := bufio.NewScanner(stdoutPipe)
 
 	ready := make(chan struct{})
+	go watchXrayStartup(stdout, ready)
 
-	go func() {
-		for stdoutScanner.Scan() {
-			line := stdoutScanner.Text()
-			fmt.Println("xray:", line)
-			stdoutBuf.WriteString(line + "\n")
-
-			if strings.Contains(line, "Failed to start:") {
-				close(ready)
-				return
-			}
-			if strings.Contains(line, "Xray ") && strings.Contains(line, " started") {
-				close(ready)
-				return
-			}
-		}
-	}()
-
-	select {
-	case <-ready:
-	case <-ctx.Done():
-		return nil, errors.New("timeout waiting for the xray verification client startup")
-	}
-
-	output := stdoutBuf.String()
-
-	if strings.Contains(output, "Failed to start:") {
-		_ = cmd.Process.Kill()
-		return nil, fmt.Errorf("xray verification client failed to start: %v", output)
+	if err := waitForXrayReady(ctx, ready, xray.Client.Port); err != nil {
+		terminateProcess(cmd)
+		return nil, err
 	}
 
 	app.logger.Info.Println("xray started successfully. Performing IP info request...")
-
 	proxy := utils.HTTPProxy{IP: "127.0.0.1", Port: xray.Client.Port}
 	apiResponse, err := utils.GetRequestWithProxy(ctx, xray.Client.IPCheckerURL, &proxy)
 	if err != nil {
-		_ = cmd.Process.Signal(syscall.SIGTERM)
-		_ = cmd.Wait()
+		terminateProcess(cmd)
 		return nil, fmt.Errorf("failed to fetch the warp status JSON from the ip checker API: %w", err)
 	}
 
 	app.logger.Info.Println("sending SIGTERM to the xray verification client...")
-	if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
-		return nil, fmt.Errorf("failed to send SIGTERM: %w", err)
-	}
-	if err := cmd.Wait(); err != nil {
-		return nil, fmt.Errorf("xray verification client exited with error: %w", err)
+	if err := terminateProcess(cmd); err != nil {
+		return nil, err
 	}
 
 	return apiResponse, nil
