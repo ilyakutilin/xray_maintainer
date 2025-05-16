@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func TestGetRequest_Success(t *testing.T) {
+func TestGetRequestWithProxy_Success(t *testing.T) {
 	// Setup a test HTTP server
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -18,14 +18,14 @@ func TestGetRequest_Success(t *testing.T) {
 	defer ts.Close()
 
 	ctx := context.Background()
-	body, err := GetRequest(ctx, ts.URL)
+	body, err := GetRequestWithProxy(ctx, ts.URL, nil)
 
 	AssertNoError(t, err)
 
 	AssertCorrectString(t, string(body), "test response")
 }
 
-func TestGetRequest_Non200Status(t *testing.T) {
+func TestGetRequestWithProxy_Non200Status(t *testing.T) {
 	// Setup a test HTTP server that returns 404
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
@@ -33,13 +33,13 @@ func TestGetRequest_Non200Status(t *testing.T) {
 	defer ts.Close()
 
 	ctx := context.Background()
-	_, err := GetRequest(ctx, ts.URL)
+	_, err := GetRequestWithProxy(ctx, ts.URL, nil)
 
 	AssertError(t, err)
 	AssertErrorContains(t, err, "received bad status code when making http request to")
 }
 
-func TestGetRequest_ContextTimeout(t *testing.T) {
+func TestGetRequestWithProxy_ContextTimeout(t *testing.T) {
 	// Setup a test HTTP server that delays response
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(100 * time.Millisecond) // Longer than our test context timeout
@@ -51,7 +51,7 @@ func TestGetRequest_ContextTimeout(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
 	defer cancel()
 
-	_, err := GetRequest(ctx, ts.URL)
+	_, err := GetRequestWithProxy(ctx, ts.URL, nil)
 
 	AssertError(t, err)
 	if !errors.Is(err, context.DeadlineExceeded) {
@@ -59,7 +59,7 @@ func TestGetRequest_ContextTimeout(t *testing.T) {
 	}
 }
 
-func TestGetRequest_InvalidURL(t *testing.T) {
+func TestGetRequestWithProxy_InvalidURL(t *testing.T) {
 	testCases := []struct {
 		name     string
 		url      string
@@ -86,14 +86,14 @@ func TestGetRequest_InvalidURL(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := GetRequest(ctx, tc.url)
+			_, err := GetRequestWithProxy(ctx, tc.url, nil)
 			AssertError(t, err)
 			AssertErrorContains(t, err, tc.expected)
 		})
 	}
 }
 
-func TestGetRequest_ReadBodyError(t *testing.T) {
+func TestGetRequestWithProxy_ReadBodyError(t *testing.T) {
 	// Setup a test HTTP server that closes the connection immediately after headers
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -108,8 +108,10 @@ func TestGetRequest_ReadBodyError(t *testing.T) {
 	defer ts.Close()
 
 	ctx := context.Background()
-	_, err := GetRequest(ctx, ts.URL)
+	_, err := GetRequestWithProxy(ctx, ts.URL, nil)
 
 	AssertError(t, err)
 	AssertErrorContains(t, err, "failed to read response body")
 }
+
+// TODO: Test the proxy

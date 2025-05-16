@@ -11,9 +11,14 @@ import (
 	"time"
 )
 
-// GetRequest makes a GET request to the specified URL with timeout support via context.
+type HTTPProxy struct {
+	IP   string
+	Port int
+}
+
+// GetRequestWithProxy makes a GET request to the specified URL with timeout support via context.
 // Returns the response body as bytes slice or an error if the request fails.
-func GetRequest(ctx context.Context, urlStr string) ([]byte, error) {
+func GetRequestWithProxy(ctx context.Context, urlStr string, proxy *HTTPProxy) ([]byte, error) {
 	// Validate URL first
 	if urlStr == "" {
 		return nil, fmt.Errorf("empty URL provided")
@@ -35,9 +40,25 @@ func GetRequest(ctx context.Context, urlStr string) ([]byte, error) {
 		return nil, fmt.Errorf("failed to create http request to %s: %w", urlStr, err)
 	}
 
-	client := &http.Client{
-		Timeout: 10 * time.Second,
+	var client *http.Client
+
+	if proxy != nil {
+		proxyURL, err := url.Parse(fmt.Sprintf("http://%s:%d", proxy.IP, proxy.Port))
+		if err != nil {
+			return nil, fmt.Errorf("could not parse the http proxy credentials: "+
+				"provided IP is %s, provided port is %d, the resulting proxy URL is "+
+				"%s, and apparently it is not a valid proxy URL",
+				proxy.IP, proxy.Port, proxyURL)
+		}
+
+		client = &http.Client{
+			Transport: &http.Transport{
+				Proxy: http.ProxyURL(proxyURL),
+			},
+		}
 	}
+
+	client.Timeout = 10 * time.Second
 
 	resp, err := client.Do(req)
 	if err != nil {
