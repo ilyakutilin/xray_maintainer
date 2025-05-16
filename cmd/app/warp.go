@@ -166,7 +166,7 @@ func (app *Application) getWarpStatus(ctx context.Context, xray Xray) ([]byte, e
 				close(ready)
 				return
 			}
-			if strings.Contains(line, "Reading config:") {
+			if strings.Contains(line, "Xray ") && strings.Contains(line, " started") {
 				close(ready)
 				return
 			}
@@ -186,7 +186,6 @@ func (app *Application) getWarpStatus(ctx context.Context, xray Xray) ([]byte, e
 		return nil, fmt.Errorf("xray verification client failed to start: %v", output)
 	}
 
-	time.Sleep(2 * time.Second)
 	app.logger.Info.Println("xray started successfully. Performing IP info request...")
 
 	proxy := utils.HTTPProxy{IP: "127.0.0.1", Port: xray.Client.Port}
