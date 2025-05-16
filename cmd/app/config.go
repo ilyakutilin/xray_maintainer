@@ -31,6 +31,7 @@ type Xray struct {
 	Server             XrayServer `koanf:"server"`
 	Client             XrayClient `koanf:"client"`
 	ExecutableFilePath string
+	CFCredFilePath     string
 }
 
 type Repo struct {
@@ -107,6 +108,23 @@ var defaults = Config{
 	},
 }
 
+func findFilenameInRepo(repos []Repo, repoName string) (string, error) {
+	var fileName string
+
+	for _, repo := range repos {
+		if repo.Name == repoName {
+			fileName = repo.Filename
+		}
+	}
+
+	if fileName == "" {
+		return "", fmt.Errorf("the name for the %s has not been set in the config. "+
+			"Please set the filename for the %s", repoName, repoName)
+	}
+
+	return fileName, nil
+}
+
 // Loads configuration
 func loadConfig() (*Config, error) {
 	var k = koanf.New(".")
@@ -137,18 +155,17 @@ func loadConfig() (*Config, error) {
 	cfg.Xray.Server.ConfigFilePath = filepath.Join(cfg.Workdir, "server-config.json")
 	cfg.Xray.Client.ConfigFilePath = filepath.Join(cfg.Workdir, "client-config.json")
 
-	var xrayExecutableFileName string
-	for _, repo := range cfg.Repos {
-		if repo.Name == "xray-core" {
-			xrayExecutableFileName = repo.Filename
-		}
-	}
-	if xrayExecutableFileName == "" {
-		return nil, errors.New("the name for the xray core executable has not " +
-			"been set in the config. Please set the filename for the xray " +
-			"executable")
+	xrayExecutableFileName, err := findFilenameInRepo(cfg.Repos, "xray-core")
+	if err != nil {
+		return nil, err
 	}
 	cfg.Xray.ExecutableFilePath = filepath.Join(cfg.Workdir, xrayExecutableFileName)
+
+	cfCredFileName, err := findFilenameInRepo(cfg.Repos, "cf_cred_generator")
+	if err != nil {
+		return nil, err
+	}
+	cfg.Xray.CFCredFilePath = filepath.Join(cfg.Workdir, cfCredFileName)
 
 	rawSenders := []messages.Sender{
 		&cfg.Messages.EmailSender,
