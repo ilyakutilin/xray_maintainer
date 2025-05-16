@@ -139,7 +139,7 @@ func loadConfig() (*Config, error) {
 
 	var xrayExecutableFileName string
 	for _, repo := range cfg.Repos {
-		if repo.Name == "xray_core" {
+		if repo.Name == "xray-core" {
 			xrayExecutableFileName = repo.Filename
 		}
 	}
