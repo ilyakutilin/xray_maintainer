@@ -67,7 +67,7 @@ func parseCFCreds(output string) (CFCreds, error) {
 	return result, nil
 }
 
-func getClientConfig(xrayClient *XrayClient, xrayServerConfig *ServerConfig) *ClientConfig {
+func getClientConfig(xrayClient *XrayClient, xrayServer *XrayServer, xrayServerConfig *ServerConfig) *ClientConfig {
 	var clientConfig ClientConfig
 
 	clientConfig.Log = xrayServerConfig.Log
@@ -88,6 +88,7 @@ func getClientConfig(xrayClient *XrayClient, xrayServerConfig *ServerConfig) *Cl
 	for _, inbound := range xrayServerConfig.Inbounds {
 		if inbound.Protocol == xrayClient.ServerProtocol {
 			found = true
+			cs.Address = xrayServer.IP
 			cs.Port = inbound.Port
 			cs.Method = inbound.Settings.Method
 			cs.Password = inbound.Settings.Password
@@ -185,9 +186,11 @@ func (app *Application) getWarpStatus(ctx context.Context, xray Xray) ([]byte, e
 		return nil, fmt.Errorf("xray verification client failed to start: %v", output)
 	}
 
+	time.Sleep(2 * time.Second)
 	app.logger.Info.Println("xray started successfully. Performing IP info request...")
 
-	apiResponse, err := utils.GetRequest(ctx, xray.Client.IPCheckerURL)
+	proxy := utils.HTTPProxy{IP: "127.0.0.1", Port: xray.Client.Port}
+	apiResponse, err := utils.GetRequestWithProxy(ctx, xray.Client.IPCheckerURL, &proxy)
 	if err != nil {
 		_ = cmd.Process.Signal(syscall.SIGTERM)
 		_ = cmd.Wait()
@@ -234,7 +237,7 @@ func checkWarpStatus(ipCheckerResponseJSON []byte, xrayServerIP string) error {
 
 	if !strings.Contains(strings.ToLower(r.ISP), "cloudflare") || !strings.Contains(strings.ToLower(r.Org), "cloudflare") {
 		return fmt.Errorf("ip checker could not detect Cloudflare in ISP or Org "+
-			"which means that Warp is not active. ISP: %s; Org: %s", r.ISP, r.Org)
+			"which means that Warp is not active. ISP: %s; Org: %s. Full response: %v", r.ISP, r.Org, r)
 	}
 
 	return nil
@@ -256,7 +259,7 @@ func (app *Application) updateWarp(ctx context.Context, xray Xray) error {
 	}
 
 	// Get the client config and verify that warp is active
-	clientConfig := getClientConfig(&xray.Client, &xrayServerConfig)
+	clientConfig := getClientConfig(&xray.Client, &xray.Server, &xrayServerConfig)
 	if err := utils.WriteStructToJSONFile(clientConfig, xray.Client.ConfigFilePath); err != nil {
 		return fmt.Errorf("error writing client config to %q: %w", xray.Client.ConfigFilePath, err)
 	}
@@ -266,13 +269,15 @@ func (app *Application) updateWarp(ctx context.Context, xray Xray) error {
 	if err != nil {
 		return fmt.Errorf("failed to obtain the warp status: %w", err)
 	}
-	if err := checkWarpStatus(ipCheckerResponse, xray.Server.IP); err == nil {
+	err = checkWarpStatus(ipCheckerResponse, xray.Server.IP)
+	if err == nil {
 		app.logger.Info.Println("Warp is active, so its update is not required.")
 		return nil
 	}
 
-	// TODO: Everything below is temporary for checking
-	// You actually need to download the CF cred generator, launch it, parse the output,
+	app.logger.Error.Printf("Warp is not active, so its update is required: %v", err)
+
+	// TODO: Launch the CF cred generator, parse the output,
 	// write new values to the struct, and then write the struct to the json
 
 	return nil

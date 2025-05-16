@@ -276,15 +276,19 @@ func TestGetClientConfig(t *testing.T) {
 				Port:           23456,
 			}
 
+			xrayServer := XrayServer{
+				IP: "1.1.1.1",
+			}
+
 			if tt.panicMsg != "" {
 				utils.AssertPanics(t, func() {
-					_ = getClientConfig(&xrayClient, &xrayServerConfig)
+					_ = getClientConfig(&xrayClient, &xrayServer, &xrayServerConfig)
 				}, tt.panicMsg)
 			} else {
 				utils.AssertDoesNotPanic(t, func() {
-					_ = getClientConfig(&xrayClient, &xrayServerConfig)
+					_ = getClientConfig(&xrayClient, &xrayServer, &xrayServerConfig)
 				})
-				clientConfig := getClientConfig(&xrayClient, &xrayServerConfig)
+				clientConfig := getClientConfig(&xrayClient, &xrayServer, &xrayServerConfig)
 
 				utils.AssertCorrectInt(t, 23456, clientConfig.Inbounds[0].Port)
 				utils.AssertCorrectString(t, "http", clientConfig.Inbounds[0].Protocol)

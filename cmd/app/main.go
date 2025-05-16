@@ -59,11 +59,9 @@ func main() {
 
 	ctx := context.Background()
 	// TODO: Add error handling
-	if !app.debug {
-		err = app.updateWarp(ctx, cfg.Xray)
-		if err != nil {
-			app.logger.Error.Fatalf("Error updating warp config: %v", err)
-		}
+	err = app.updateWarp(ctx, cfg.Xray)
+	if err != nil {
+		app.logger.Error.Fatalf("Error updating warp config: %v", err)
 	}
 
 	// // TODO: Add error handling
@@ -76,5 +74,4 @@ func main() {
 	// TODO: Remove print stmt
 	// fmt.Println(cfg.Workdir)
 	// fmt.Println(cfg.Xray.Server.IP)
-	fmt.Println(cfg)
 }
