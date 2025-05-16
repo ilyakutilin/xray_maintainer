@@ -70,7 +70,7 @@ func parseCFCreds(output string) (CFCreds, error) {
 func getClientConfig(xrayClient *XrayClient, xrayServer *XrayServer, xrayServerConfig *ServerConfig) *ClientConfig {
 	var clientConfig ClientConfig
 
-	clientConfig.Log = xrayServerConfig.Log
+	clientConfig.Log = Log{Loglevel: "warning"}
 
 	clientInbound := ClientInbound{
 		Port:     xrayClient.Port,
