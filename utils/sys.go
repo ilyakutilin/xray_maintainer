@@ -2,6 +2,7 @@ package utils
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -18,15 +19,18 @@ func CheckSudo() error {
 }
 
 // Runs a shell command and returns its output or an error.
-func ExecuteCommand(cmdStr string) (string, error) {
-	cmd := exec.Command("bash", "-c", cmdStr)
+func ExecuteCommand(ctx context.Context, cmdStr string) (string, error) {
+	cmd := exec.CommandContext(ctx, "bash", "-c", cmdStr)
+
 	var out bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &stderr
 
-	// TODO: Implement timeout
 	err := cmd.Run()
+	if ctx.Err() == context.DeadlineExceeded {
+		return stderr.String(), fmt.Errorf("command timed out: %w", ctx.Err())
+	}
 	if err != nil {
 		return stderr.String(), fmt.Errorf("command execution failed: %w", err)
 	}
@@ -34,37 +38,37 @@ func ExecuteCommand(cmdStr string) (string, error) {
 	return out.String(), nil
 }
 
-type CommandExecutor func(string) (string, error)
+type CommandExecutor func(context.Context, string) (string, error)
 
 var defaultExecutor CommandExecutor = ExecuteCommand
 
-func RestartService(serviceName string, executor CommandExecutor) error {
+func RestartService(ctx context.Context, serviceName string, executor CommandExecutor) error {
 	if executor == nil {
 		executor = defaultExecutor
 	}
 
-	_, err := executor(fmt.Sprintf("sudo systemctl restart %s", serviceName))
+	_, err := executor(ctx, fmt.Sprintf("sudo systemctl restart %s", serviceName))
 	return err
 }
 
-func CheckServiceStatus(serviceName string, executor CommandExecutor) (bool, error) {
+func CheckServiceStatus(ctx context.Context, serviceName string, executor CommandExecutor) (bool, error) {
 	if executor == nil {
 		executor = defaultExecutor
 	}
 
-	output, err := executor(fmt.Sprintf("systemctl is-active %s", serviceName))
+	output, err := executor(ctx, fmt.Sprintf("systemctl is-active %s", serviceName))
 	if err != nil {
 		return false, err
 	}
 	return output == "active", nil
 }
 
-func CheckOperability(serviceName string, executor CommandExecutor) error {
-	err := RestartService(serviceName, executor)
+func CheckOperability(ctx context.Context, serviceName string, executor CommandExecutor) error {
+	err := RestartService(ctx, serviceName, executor)
 	if err != nil {
 		return err
 	}
-	isActive, err := CheckServiceStatus(serviceName, executor)
+	isActive, err := CheckServiceStatus(ctx, serviceName, executor)
 	if err != nil {
 		return err
 	}

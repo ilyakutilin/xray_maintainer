@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -8,6 +9,7 @@ import (
 	"os/user"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestCheckSudo(t *testing.T) {
@@ -34,6 +36,7 @@ func TestExecuteCommand(t *testing.T) {
 	tests := []struct {
 		name        string
 		cmdStr      string
+		timeout     time.Duration
 		wantOutput  string
 		wantError   bool
 		errorSubstr string
@@ -41,44 +44,60 @@ func TestExecuteCommand(t *testing.T) {
 		{
 			name:       "successful command",
 			cmdStr:     "echo hello world",
+			timeout:    2 * time.Second,
 			wantOutput: "hello world\n",
 			wantError:  false,
 		},
 		{
 			name:        "command with error",
 			cmdStr:      "ls /nonexistentdirectory",
+			timeout:     2 * time.Second,
 			wantError:   true,
 			errorSubstr: "command execution failed",
 		},
 		{
 			name:       "empty command",
 			cmdStr:     "",
+			timeout:    2 * time.Second,
 			wantOutput: "",
 			wantError:  false,
 		},
 		{
 			name:       "command with spaces",
 			cmdStr:     " echo  'test  spaces' ",
+			timeout:    2 * time.Second,
 			wantOutput: "test  spaces\n",
 			wantError:  false,
 		},
 		{
 			name:       "whitespace-only command",
 			cmdStr:     "   ",
+			timeout:    2 * time.Second,
 			wantOutput: "",
 			wantError:  false,
 		},
 		{
 			name:        "invalid command syntax",
 			cmdStr:      "echo 'unclosed quote",
+			timeout:     2 * time.Second,
 			wantError:   true,
 			errorSubstr: "command execution failed",
+		},
+		{
+			name:        "command times out",
+			cmdStr:      "sleep 5",
+			timeout:     1 * time.Second,
+			wantError:   true,
+			errorSubstr: "command timed out",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			output, err := ExecuteCommand(tt.cmdStr)
+			ctx, cancel := context.WithTimeout(context.Background(), tt.timeout)
+			defer cancel()
+
+			output, err := ExecuteCommand(ctx, tt.cmdStr)
 
 			if (err != nil) != tt.wantError {
 				t.Errorf("ExecuteCommand() error = %v, wantError %v", err, tt.wantError)
@@ -97,7 +116,7 @@ func TestExecuteCommand(t *testing.T) {
 				}
 
 				// Also verify that we get stderr output when there's an error
-				if output == "" {
+				if output == "" && tt.name != "command times out" {
 					t.Error("ExecuteCommand() returned empty stderr output for failed command")
 				}
 			}
@@ -105,7 +124,10 @@ func TestExecuteCommand(t *testing.T) {
 	}
 
 	t.Run("nonexistent command", func(t *testing.T) {
-		_, err := ExecuteCommand("nonexistentcommand123")
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		_, err := ExecuteCommand(ctx, "nonexistentcommand123")
 		if err == nil {
 			t.Error("expected error for nonexistent command, got nil")
 		}
@@ -118,16 +140,19 @@ func TestExecuteCommand(t *testing.T) {
 }
 
 func TestRestartService(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
 	tests := []struct {
 		name        string
 		serviceName string
-		mockExec    func(string) (string, error)
+		mockExec    func(context.Context, string) (string, error)
 		wantErr     bool
 	}{
 		{
 			name:        "successful restart",
 			serviceName: "nginx",
-			mockExec: func(cmd string) (string, error) {
+			mockExec: func(ctx context.Context, cmd string) (string, error) {
 				if cmd != "sudo systemctl restart nginx" {
 					return "", fmt.Errorf("unexpected command")
 				}
@@ -138,7 +163,7 @@ func TestRestartService(t *testing.T) {
 		{
 			name:        "failed restart",
 			serviceName: "mysql",
-			mockExec: func(cmd string) (string, error) {
+			mockExec: func(ctx context.Context, cmd string) (string, error) {
 				return "", fmt.Errorf("permission denied")
 			},
 			wantErr: true,
@@ -147,7 +172,7 @@ func TestRestartService(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := RestartService(tt.serviceName, tt.mockExec)
+			err := RestartService(ctx, tt.serviceName, tt.mockExec)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("RestartService() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -208,7 +233,10 @@ func TestCheckServiceStatus(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockExecutor := func(cmd string) (string, error) {
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+
+			mockExecutor := func(ctx context.Context, cmd string) (string, error) {
 				expectedCmd := fmt.Sprintf("systemctl is-active %s", tt.serviceName)
 				if cmd != expectedCmd {
 					t.Errorf("expected command: %q, got: %q", expectedCmd, cmd)
@@ -216,7 +244,7 @@ func TestCheckServiceStatus(t *testing.T) {
 				return tt.mockResponse, tt.mockError
 			}
 
-			active, err := CheckServiceStatus(tt.serviceName, mockExecutor)
+			active, err := CheckServiceStatus(ctx, tt.serviceName, mockExecutor)
 
 			if (err != nil) != tt.expectErr {
 				t.Errorf("expected error: %v, got: %v", tt.expectErr, err)
@@ -230,16 +258,19 @@ func TestCheckServiceStatus(t *testing.T) {
 }
 
 func TestCheckServiceStatusWithDefaultExecutor(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
 	// Save original default executor
 	originalExecutor := defaultExecutor
 	defer func() { defaultExecutor = originalExecutor }()
 
 	// Set up mock default executor
-	defaultExecutor = func(cmd string) (string, error) {
+	defaultExecutor = func(ctx context.Context, cmd string) (string, error) {
 		return "active", nil
 	}
 
-	active, err := CheckServiceStatus("nginx", nil)
+	active, err := CheckServiceStatus(ctx, "nginx", nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -288,7 +319,10 @@ func TestCheckOperability(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockExecutor := func(cmd string) (string, error) {
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+
+			mockExecutor := func(ctx context.Context, cmd string) (string, error) {
 				if strings.Contains(cmd, "sudo systemctl restart") {
 					if tt.restartErr != nil {
 						return "", tt.restartErr
@@ -307,7 +341,7 @@ func TestCheckOperability(t *testing.T) {
 				return "", nil
 			}
 
-			err := CheckOperability(tt.serviceName, mockExecutor)
+			err := CheckOperability(ctx, tt.serviceName, mockExecutor)
 
 			// Test error conditions
 			if tt.expectedErr == nil && err != nil {
@@ -324,6 +358,9 @@ func TestCheckOperability(t *testing.T) {
 }
 
 func TestCheckOperabilityIntegration(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
@@ -335,7 +372,7 @@ func TestCheckOperabilityIntegration(t *testing.T) {
 
 	// Test with a real service that should exist on most systems
 	serviceName := "cron"
-	err = CheckOperability(serviceName, nil)
+	err = CheckOperability(ctx, serviceName, nil)
 	if err != nil {
 		t.Errorf("CheckOperability failed: %v", err)
 	}
