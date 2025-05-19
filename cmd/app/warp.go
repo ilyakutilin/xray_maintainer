@@ -20,6 +20,25 @@ type CFCreds struct {
 	Endpoint  string
 }
 
+func (app Application) getCFCreds(ctx context.Context, cfCredFilePath string) (string, error) {
+	if app.debug {
+		return `device_id: abcdefab-0123-01ab-23cd-0123abcd4567
+token: deadbeef-0000-cafe-babe-0000feedface
+account_id: abcdef12-3456-aaaa-bbbb-cccc12345678
+account_type: free
+license: ExamplE1-Fake1234-DemoTest
+private_key: FAKEFAKE/DEMO1234+NOTREALDATA==EXAMPLE12/==
+public_key: ZZZZ0000/FAKEYFAK+12345678/DEMODEMO==TEST
+client_id: a1o2
+reserved: [ 100, 200, 300 ]
+v4: 172.16.0.2
+v6: dead:beef:0000:fake:1234:cafe:feed:0001
+endpoint: engage.cloudflareclient.com:2408`, nil
+	}
+
+	return utils.ExecuteCommand(ctx, cfCredFilePath)
+}
+
 // Parses the Cloudflare generator output. Tailored specifically for the output of
 // github.com/badafans/warp-reg.
 func parseCFCreds(output string) (CFCreds, error) {
@@ -132,40 +151,7 @@ func getClientConfig(xrayClient *XrayClient, xrayServer *XrayServer, xrayServerC
 	return &clientConfig
 }
 
-func (app *Application) getWarpStatus(ctx context.Context, xray Xray) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	cmd, stdout, err := startXrayClient(ctx, xray)
-	if err != nil {
-		return nil, err
-	}
-
-	ready := make(chan struct{})
-	go watchXrayStartup(stdout, ready)
-
-	if err := waitForXrayReady(ctx, ready, xray.Client.Port); err != nil {
-		terminateProcess(cmd)
-		return nil, err
-	}
-
-	app.logger.Info.Println("xray started successfully. Performing IP info request...")
-	proxy := utils.HTTPProxy{IP: "127.0.0.1", Port: xray.Client.Port}
-	apiResponse, err := utils.GetRequestWithProxy(ctx, xray.Client.IPCheckerURL, &proxy)
-	if err != nil {
-		terminateProcess(cmd)
-		return nil, fmt.Errorf("failed to fetch the warp status JSON from the ip checker API: %w", err)
-	}
-
-	app.logger.Info.Println("sending SIGTERM to the xray verification client...")
-	if err := terminateProcess(cmd); err != nil {
-		return nil, err
-	}
-
-	return apiResponse, nil
-}
-
-func checkWarpStatus(ipCheckerResponseJSON []byte, xrayServerIP string) error {
+func checkIPCheckerResponse(ipCheckerResponseJSON []byte, xrayServerIP string) error {
 	type IPCheckerResponse struct {
 		Status  string `json:"status"`
 		Message string `json:"message"`
@@ -200,6 +186,44 @@ func checkWarpStatus(ipCheckerResponseJSON []byte, xrayServerIP string) error {
 	return nil
 }
 
+func (app *Application) isWarpOK(ctx context.Context, xray Xray) (bool, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	cmd, stdout, err := startXrayClient(ctx, xray)
+	if err != nil {
+		return false, err
+	}
+
+	ready := make(chan struct{})
+	go watchXrayStartup(stdout, ready)
+
+	if err := waitForXrayReady(ctx, ready, xray.Client.Port); err != nil {
+		terminateProcess(cmd)
+		return false, err
+	}
+
+	app.logger.Info.Println("xray started successfully. Performing IP info request...")
+	proxy := utils.HTTPProxy{IP: "127.0.0.1", Port: xray.Client.Port}
+	apiResponse, err := utils.GetRequestWithProxy(ctx, xray.Client.IPCheckerURL, &proxy)
+
+	if err != nil {
+		terminateProcess(cmd)
+		return false, fmt.Errorf("failed to fetch the warp status JSON from the ip checker API: %w", err)
+	}
+
+	app.logger.Info.Println("sending SIGTERM to the xray verification client...")
+	if err := terminateProcess(cmd); err != nil {
+		return false, err
+	}
+
+	if err := checkIPCheckerResponse(apiResponse, xray.Server.IP); err != nil {
+		return false, nil
+	}
+
+	return true, nil
+}
+
 func (app *Application) updateWarp(ctx context.Context, xray Xray) error {
 	app.logger.Info.Println("Updating warp config...")
 
@@ -222,20 +246,55 @@ func (app *Application) updateWarp(ctx context.Context, xray Xray) error {
 	}
 	app.logger.Info.Println("Successfully wrote client config to file.")
 	app.logger.Info.Println("Starting to check if the warp is active and responsive...")
-	ipCheckerResponse, err := app.getWarpStatus(ctx, xray)
+	warpOK, err := app.isWarpOK(ctx, xray)
 	if err != nil {
 		return fmt.Errorf("failed to obtain the warp status: %w", err)
 	}
-	err = checkWarpStatus(ipCheckerResponse, xray.Server.IP)
-	if err == nil {
+
+	// TODO: Remove this line
+	warpOK = !warpOK
+
+	if warpOK {
 		app.logger.Info.Println("Warp is active, so its update is not required.")
 		return nil
 	}
 
-	app.logger.Error.Printf("Warp is not active, so its update is required: %v", err)
+	app.logger.Error.Println("Warp is not active, so its update is required.")
 
 	// TODO: Launch the CF cred generator, parse the output,
 	// write new values to the struct, and then write the struct to the json
+
+	// Launch Cloudflare credential generator and capture its output
+	// TODO: At this point it just freezes. Check how the generator launches and what it does.
+	cfCredOutput, err := app.getCFCreds(ctx, xray.CFCredFilePath)
+	if err != nil {
+		return fmt.Errorf("error while launching the Cloudflare credentials "+
+			"generator: %w", err)
+	}
+
+	// Parse the Cloudflare credential generator output into a struct
+	cfCreds, err := parseCFCreds(cfCredOutput)
+	if err != nil {
+		return fmt.Errorf("error while parsing the generated Cloudflare "+
+			"credentials: %w", err)
+	}
+
+	// Update the xray server config with new Warp settings
+	fmt.Printf(
+		"CFCreds struct:\n"+
+			"SecretKey: %s\n"+
+			"PublicKey: %s\n"+
+			"Reserved: %v\n"+
+			"V4: %s\n"+
+			"V6: %s\n"+
+			"Endpoint: %s\n",
+		cfCreds.SecretKey,
+		cfCreds.PublicKey,
+		cfCreds.Reserved,
+		cfCreds.V4,
+		cfCreds.V6,
+		cfCreds.Endpoint,
+	)
 
 	return nil
 }
