@@ -2,6 +2,7 @@ package main
 
 import (
 	"archive/zip"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,6 +14,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ilyakutilin/xray_maintainer/utils"
 )
@@ -503,6 +505,9 @@ func TestUpdateFile(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
 		t.Run(test.name, func(t *testing.T) {
 			tempFile := utils.CreateTempFilePath(t)
 
@@ -526,7 +531,7 @@ func TestUpdateFile(t *testing.T) {
 			file.releaseChecker = test.releaseChecker
 			file.downloader = test.downloader
 
-			err := testApp.updateFile(file)
+			err := testApp.updateFile(ctx, file)
 
 			if test.errorExpected {
 				utils.AssertError(t, err)
@@ -594,6 +599,9 @@ func TestUpdateMultipleFiles(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
 		t.Run(test.name, func(t *testing.T) {
 			tempFileOne := utils.CreateTempFilePath(t)
 			tempFileTwo := utils.CreateTempFilePath(t)
@@ -620,7 +628,7 @@ func TestUpdateMultipleFiles(t *testing.T) {
 				{Name: filenameTwo, Filename: filenameTwo},
 			}
 
-			err := testApp.updateMultipleFiles(repos, fn)
+			err := testApp.updateMultipleFiles(ctx, repos, fn)
 
 			if test.errorExpected {
 				utils.AssertError(t, err)

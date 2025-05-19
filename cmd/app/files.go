@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -153,7 +154,7 @@ func (d GitHubFileDownloader) Download(filePath string, url string) error {
 // Checks if the version of the file by the specified fullPath (including the filename)
 // can be updated to a newer version based on the latest release version from Github.
 // Updates the file if necessary.
-func (app *Application) updateFile(file File) error {
+func (app *Application) updateFile(ctx context.Context, file File) error {
 	fileName := file.repo.Filename
 	fileDir := app.workdir
 	filePath := filepath.Join(fileDir, fileName)
@@ -236,7 +237,7 @@ func (app *Application) updateFile(file File) error {
 
 	if !app.debug {
 		app.logger.Info.Println("Checking operability of xray after the file update...")
-		if err = utils.CheckOperability("xray", nil); err != nil {
+		if err = utils.CheckOperability(ctx, "xray", nil); err != nil {
 			app.logger.Error.Printf("Something went wrong with the %s file update, restoring the backup file...\n", fileName)
 			err = utils.RestoreFile(backup, filePath)
 			return err
@@ -254,12 +255,12 @@ func (app *Application) updateFile(file File) error {
 	return nil
 }
 
-func (app *Application) updateMultipleFiles(repos []Repo, fileCreator func(repo Repo) File) error {
+func (app *Application) updateMultipleFiles(ctx context.Context, repos []Repo, fileCreator func(repo Repo) File) error {
 	var errs utils.Errors
 
 	for _, repo := range repos {
 		file := fileCreator(repo)
-		err := app.updateFile(file)
+		err := app.updateFile(ctx, file)
 		if err != nil {
 			errs.Append(err)
 			app.logger.Error.Printf("Error updating %s: %v\n", repo.Name, err)

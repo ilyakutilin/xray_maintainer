@@ -48,7 +48,9 @@ func main() {
 		app.logger.Error.Fatalf("Error creating workdir: %v", err)
 	}
 
-	if err := app.updateMultipleFiles(cfg.Repos, NewFile); err != nil {
+	ctx := context.Background()
+
+	if err := app.updateMultipleFiles(ctx, cfg.Repos, NewFile); err != nil {
 		cfg.Messages.MainSender.Send(messages.Message{
 			Subject: "Error updating files",
 			Body:    fmt.Sprintf("Failed to update the files: %v", err),
@@ -57,7 +59,6 @@ func main() {
 		app.logger.Error.Fatalf("Error updating files: %v", err)
 	}
 
-	ctx := context.Background()
 	// TODO: Add error handling
 	err = app.updateWarp(ctx, cfg.Xray)
 	if err != nil {
