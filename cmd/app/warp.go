@@ -224,6 +224,31 @@ func (app *Application) isWarpOK(ctx context.Context, xray Xray) (bool, error) {
 	return true, nil
 }
 
+func updateServerWarpConfig(xrayServerConfig *ServerConfig, cfCreds *CFCreds) error {
+	var found bool
+	for _, outb := range xrayServerConfig.Outbounds {
+		if outb.Protocol == "wireguard" {
+			found = true
+			outb.Settings.SecretKey = cfCreds.SecretKey
+			outb.Settings.Address = []string{cfCreds.V4, cfCreds.V6}
+			outb.Settings.Peers = []SrvOutboundSettingsPeer{
+				{
+					Endpoint:  cfCreds.Endpoint,
+					PublicKey: cfCreds.PublicKey,
+				},
+			}
+			outb.Settings.Reserved = cfCreds.Reserved
+		}
+	}
+
+	if !found {
+		return errors.New("wireguard protocol has not been found in the xray server " +
+			"config, therefore its update is not possible")
+	}
+
+	return nil
+}
+
 func (app *Application) updateWarp(ctx context.Context, xray Xray) error {
 	app.logger.Info.Println("Updating warp config...")
 
@@ -280,21 +305,9 @@ func (app *Application) updateWarp(ctx context.Context, xray Xray) error {
 	}
 
 	// Update the xray server config with new Warp settings
-	fmt.Printf(
-		"CFCreds struct:\n"+
-			"SecretKey: %s\n"+
-			"PublicKey: %s\n"+
-			"Reserved: %v\n"+
-			"V4: %s\n"+
-			"V6: %s\n"+
-			"Endpoint: %s\n",
-		cfCreds.SecretKey,
-		cfCreds.PublicKey,
-		cfCreds.Reserved,
-		cfCreds.V4,
-		cfCreds.V6,
-		cfCreds.Endpoint,
-	)
+	if err := updateServerWarpConfig(&xrayServerConfig, &cfCreds); err != nil {
+		return fmt.Errorf("error updating the xray server config: %w", err)
+	}
 
 	return nil
 }
