@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -304,9 +305,41 @@ func (app *Application) updateWarp(ctx context.Context, xray Xray) error {
 			"credentials: %w", err)
 	}
 
-	// Update the xray server config with new Warp settings
+	app.logger.Info.Println("Updating the xray server config with new Warp settings...")
 	if err := updateServerWarpConfig(&xrayServerConfig, &cfCreds); err != nil {
 		return fmt.Errorf("error updating the xray server config: %w", err)
+	}
+
+	app.logger.Info.Println("Writing the new xray server config to file...")
+	srvBackupFile, err := utils.BackupFile(xray.Server.ConfigFilePath)
+	if err != nil {
+		return fmt.Errorf("failed to back up the xray server config file: %w", err)
+	}
+	if err := utils.WriteStructToJSONFile(&xrayServerConfig, xray.Server.ConfigFilePath); err != nil {
+		_ = os.Remove(srvBackupFile)
+		return fmt.Errorf("error writing the new xray server config to file: %w", err)
+	}
+
+	if !app.debug {
+		app.logger.Info.Println("Restarting the xray server service...")
+		if err := utils.CheckOperability(ctx, "xray", nil); err != nil {
+			app.logger.Info.Println("Xray server service is not operable after " +
+				"restart, so reverting the config file to its previous state and " +
+				"checking the xray server service operability again...")
+			if err := utils.RestoreFile(srvBackupFile, xray.Server.ConfigFilePath); err != nil {
+				return fmt.Errorf("error restoring the backup of the xray server "+
+					"config file to its original path: %w", err)
+			}
+			_ = os.Remove(srvBackupFile)
+			if err := utils.CheckOperability(ctx, "xray", nil); err != nil {
+				return fmt.Errorf("even after restoring the original xray server "+
+					"config the service is still inoperable. Further investigation "+
+					"is required: %w", err)
+			}
+		}
+		app.logger.Info.Println("Xray service is operational with the updated config.")
+		app.logger.Info.Println("This was a triumph.")
+		app.logger.Info.Println("I'm making a note here: 'HUGE SUCCESS'")
 	}
 
 	return nil
