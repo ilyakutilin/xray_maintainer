@@ -15,6 +15,7 @@ import (
 
 type XrayServer struct {
 	IP             string `koanf:"ip"`
+	ServiceName    string `koanf:"service_name"`
 	ConfigFilePath string
 }
 

@@ -12,9 +12,10 @@ import (
 )
 
 type Application struct {
-	debug   bool
-	logger  *Logger
-	workdir string
+	debug           bool
+	logger          *Logger
+	workdir         string
+	xrayServiceName string
 }
 
 func main() {
@@ -24,9 +25,10 @@ func main() {
 	}
 
 	app := Application{
-		debug:   cfg.Debug,
-		logger:  GetLogger(cfg.Debug),
-		workdir: cfg.Workdir,
+		debug:           cfg.Debug,
+		logger:          GetLogger(cfg.Debug),
+		workdir:         cfg.Workdir,
+		xrayServiceName: cfg.Xray.Server.ServiceName,
 	}
 
 	defer func() {

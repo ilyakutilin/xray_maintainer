@@ -5,6 +5,7 @@ workdir: /opt/xray/
 xray:
   server:
     ip: 123.234.123.234
+    service_name: xray.service
   client:
     port: 10801
     ip_checker_url: 'http://ip-api.com/json/?fields=status,message,isp,org,query'

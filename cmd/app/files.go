@@ -237,7 +237,7 @@ func (app *Application) updateFile(ctx context.Context, file File) error {
 
 	if !app.debug {
 		app.logger.Info.Println("Checking operability of xray after the file update...")
-		if err = utils.CheckOperability(ctx, "xray", nil); err != nil {
+		if err = utils.CheckOperability(ctx, app.xrayServiceName, nil); err != nil {
 			app.logger.Error.Printf("Something went wrong with the %s file update, restoring the backup file...\n", fileName)
 			err = utils.RestoreFile(backup, filePath)
 			return err

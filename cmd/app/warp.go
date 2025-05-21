@@ -322,7 +322,7 @@ func (app *Application) updateWarp(ctx context.Context, xray Xray) error {
 
 	if !app.debug {
 		app.logger.Info.Println("Restarting the xray server service...")
-		if err := utils.CheckOperability(ctx, "xray", nil); err != nil {
+		if err := utils.CheckOperability(ctx, app.xrayServiceName, nil); err != nil {
 			app.logger.Info.Println("Xray server service is not operable after " +
 				"restart, so reverting the config file to its previous state and " +
 				"checking the xray server service operability again...")
@@ -331,7 +331,7 @@ func (app *Application) updateWarp(ctx context.Context, xray Xray) error {
 					"config file to its original path: %w", err)
 			}
 			_ = os.Remove(srvBackupFile)
-			if err := utils.CheckOperability(ctx, "xray", nil); err != nil {
+			if err := utils.CheckOperability(ctx, app.xrayServiceName, nil); err != nil {
 				return fmt.Errorf("even after restoring the original xray server "+
 					"config the service is still inoperable. Further investigation "+
 					"is required: %w", err)
