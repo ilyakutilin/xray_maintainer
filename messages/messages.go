@@ -3,9 +3,10 @@ package messages
 import "github.com/ilyakutilin/xray_maintainer/utils"
 
 type Message struct {
-	Subject string
-	Body    string
-	Errors  []error
+	Subject  string
+	Body     string
+	Notes    []string
+	Warnings []string
 }
 
 type Sender interface {

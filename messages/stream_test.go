@@ -2,7 +2,6 @@ package messages
 
 import (
 	"bytes"
-	"fmt"
 	"os"
 	"testing"
 )
@@ -34,43 +33,129 @@ func TestStreamSender_Send(t *testing.T) {
 			message: Message{
 				Subject: "Test Subject",
 				Body:    "Test Body",
-				Errors:  []error{},
 			},
 			expected: `The following message would be sent:
 Subject: Test Subject
 Body: Test Body
-There are no errors.
 `,
 		},
 		{
-			name: "single error",
+			name: "single note",
 			message: Message{
-				Subject: "Single Error",
-				Body:    "Error Body",
-				Errors:  []error{fmt.Errorf("test error")},
+				Subject: "Test Subject",
+				Body:    "Test Body",
+				Notes:   []string{"Test Note"},
 			},
 			expected: `The following message would be sent:
-Subject: Single Error
-Body: Error Body
-Error: test error
+Subject: Test Subject
+Body: Test Body
+
+Note: Test Note
 `,
 		},
 		{
-			name: "multiple errors",
+			name: "multiple notes",
 			message: Message{
-				Subject: "Multi Error",
-				Body:    "Multi Body",
-				Errors: []error{
-					fmt.Errorf("first error"),
-					fmt.Errorf("second error"),
-				},
+				Subject: "Test Subject",
+				Body:    "Test Body",
+				Notes:   []string{"First Note", "Second Note"},
 			},
 			expected: `The following message would be sent:
-Subject: Multi Error
-Body: Multi Body
-There are 2 errors:
-0) first error
-1) second error
+Subject: Test Subject
+Body: Test Body
+
+Notes:
+0) First Note
+1) Second Note
+`,
+		},
+		{
+			name: "single warning",
+			message: Message{
+				Subject:  "Test Subject",
+				Body:     "Test Body",
+				Warnings: []string{"Test Warning"},
+			},
+			expected: `The following message would be sent:
+Subject: Test Subject
+Body: Test Body
+
+Warning: Test Warning
+`,
+		},
+		{
+			name: "multiple warnings",
+			message: Message{
+				Subject:  "Test Subject",
+				Body:     "Test Body",
+				Warnings: []string{"First Warning", "Second Warning"},
+			},
+			expected: `The following message would be sent:
+Subject: Test Subject
+Body: Test Body
+
+Warnings:
+0) First Warning
+1) Second Warning
+`,
+		},
+		{
+			name: "multiple notes, one warning",
+			message: Message{
+				Subject:  "Test Subject",
+				Body:     "Test Body",
+				Notes:    []string{"First Note", "Second Note"},
+				Warnings: []string{"Test Warning"},
+			},
+			expected: `The following message would be sent:
+Subject: Test Subject
+Body: Test Body
+
+Notes:
+0) First Note
+1) Second Note
+
+Warning: Test Warning
+`,
+		},
+		{
+			name: "one note, multiple warnings",
+			message: Message{
+				Subject:  "Test Subject",
+				Body:     "Test Body",
+				Notes:    []string{"Test Note"},
+				Warnings: []string{"First Warning", "Second Warning"},
+			},
+			expected: `The following message would be sent:
+Subject: Test Subject
+Body: Test Body
+
+Note: Test Note
+
+Warnings:
+0) First Warning
+1) Second Warning
+`,
+		},
+		{
+			name: "multiple notes, multiple warnings",
+			message: Message{
+				Subject:  "Test Subject",
+				Body:     "Test Body",
+				Notes:    []string{"First Note", "Second Note"},
+				Warnings: []string{"First Warning", "Second Warning"},
+			},
+			expected: `The following message would be sent:
+Subject: Test Subject
+Body: Test Body
+
+Notes:
+0) First Note
+1) Second Note
+
+Warnings:
+0) First Warning
+1) Second Warning
 `,
 		},
 		{
@@ -78,12 +163,10 @@ There are 2 errors:
 			message: Message{
 				Subject: "",
 				Body:    "",
-				Errors:  []error{},
 			},
 			expected: `The following message would be sent:
 Subject: 
 Body: 
-There are no errors.
 `,
 		},
 	}
