@@ -33,7 +33,7 @@ public_key: ZZZZ0000/FAKEYFAK+12345678/DEMODEMO==TEST
 client_id: a1o2
 reserved: [ 100, 200, 300 ]
 v4: 172.16.0.2
-v6: dead:beef:0000:fake:1234:cafe:feed:0001
+v6: 2001:db8::1
 endpoint: engage.cloudflareclient.com:2408`, nil
 	}
 
