@@ -7,7 +7,6 @@ import (
 	"os"
 	"runtime/debug"
 
-	"github.com/ilyakutilin/xray_maintainer/messages"
 	"github.com/ilyakutilin/xray_maintainer/utils"
 )
 
@@ -16,6 +15,8 @@ type Application struct {
 	logger          *Logger
 	workdir         string
 	xrayServiceName string
+	notes           []string
+	warnings        []string
 }
 
 func main() {
@@ -42,22 +43,24 @@ func main() {
 
 	// Check if the workdir exists, if not create it
 	if err := utils.EnsureDir(cfg.Workdir); err != nil {
-		cfg.Messages.MainSender.Send(messages.Message{
-			Subject: "Error creating workdir",
-			Body: fmt.Sprintf("Failed to create the main app workdir %s "+
+		app.sendMsg(
+			cfg.Messages,
+			"Error creating workdir",
+			fmt.Sprintf("Failed to create the main app workdir %s "+
 				"due to the following error:\n%v\nThe process stopped at this point "+
 				"and nothing else was done.", cfg.Workdir, err),
-		})
+		)
 		app.logger.Error.Fatalf("Error creating workdir: %v", err)
 	}
 
 	ctx := context.Background()
 
 	if err := app.updateMultipleFiles(ctx, cfg.Repos, NewFile); err != nil {
-		cfg.Messages.MainSender.Send(messages.Message{
-			Subject: "Error updating files",
-			Body:    fmt.Sprintf("Failed to update the files: %v", err),
-		})
+		app.sendMsg(
+			cfg.Messages,
+			"Error updating files",
+			fmt.Sprintf("Failed to update the files: %v", err),
+		)
 		app.logger.Error.Fatalf("Error updating files: %v", err)
 	}
 
