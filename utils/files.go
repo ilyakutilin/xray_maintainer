@@ -148,10 +148,8 @@ func ExtractFileFromZip(zipFilePath string, fileName string) (string, error) {
 		return "", fmt.Errorf("failed to extract file %s from zip %s: %w", fileName, zipFileName, err)
 	}
 
-	// Delete the ZIP archive
-	if err := os.Remove(zipFilePath); err != nil {
-		return "", fmt.Errorf("failed to delete zip file %s: %w", zipFileName, err)
-	}
+	// Delete the ZIP archive (doesn't really matter if there are any errors here)
+	os.Remove(zipFilePath)
 
 	return destPath, nil
 }
@@ -162,7 +160,7 @@ func ExtractFileFromZip(zipFilePath string, fileName string) (string, error) {
 func BackupFile(filePath string) (string, error) {
 	backupFilePath := filePath + ".backup"
 	if err := os.Rename(filePath, backupFilePath); err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to rename %s to %s", filePath, backupFilePath)
 	}
 	return backupFilePath, nil
 }

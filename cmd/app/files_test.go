@@ -317,7 +317,7 @@ func TestDownload(t *testing.T) {
 			filePath:    filePath,
 			url:         mockServer.URL + "/servererror",
 			wantErr:     true,
-			errContains: "failed to download file: HTTP 500",
+			errContains: "failed to download file testfile.txt: HTTP 500",
 		},
 		{
 			name:        "directory without permissions",

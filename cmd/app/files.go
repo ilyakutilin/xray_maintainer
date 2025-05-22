@@ -44,12 +44,12 @@ func getStoredReleaseTag(fileName string, versionFilePath string) (string, error
 		if os.IsNotExist(err) {
 			return "", nil // No stored version yet
 		}
-		return "", err
+		return "", fmt.Errorf("failed to read the versions file: %w", err)
 	}
 
 	var versions map[string]string
 	if err := json.Unmarshal(data, &versions); err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to unmarshal the versions file: %w", err)
 	}
 
 	version, exists := versions[fileName]
@@ -114,38 +114,41 @@ func (rc GithubReleaseChecker) GetLatestReleaseTag(apiURL string) (string, error
 
 // Downloads a file from a given URL and saves it to a specified directory path.
 // If a filename is provided, it will be used, otherwise the filename will be extracted
-// from the URL. The permissions are set based on umask. Returns the full path
-// to the downloaded file.
+// from the URL.
 func (d GitHubFileDownloader) Download(filePath string, url string) error {
 	dirPath := filepath.Dir(filePath)
+	fileName := filepath.Base(filePath)
 
 	if err := os.MkdirAll(dirPath, os.ModePerm); err != nil {
-		return err
+		return fmt.Errorf("failed to create directory %s: %w", dirPath, err)
 	}
 
 	resp, err := http.Get(url)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get the response from the url %s: %w", url, err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNotFound {
-		return fmt.Errorf("file not found: %s", url)
+		return fmt.Errorf("file not found at %s", url)
 	}
 
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("failed to download file: HTTP %d", resp.StatusCode)
+		return fmt.Errorf("failed to download file %s: HTTP %d",
+			fileName, resp.StatusCode)
 	}
 
 	out, err := os.Create(filePath)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create the file %s at path %s: %w",
+			fileName, filePath, err)
 	}
 	defer out.Close()
 
 	_, err = io.Copy(out, resp.Body)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to copy the contents of the new file to the file "+
+			"at path %s: %w", filePath, err)
 	}
 
 	return nil
@@ -164,9 +167,12 @@ func (app *Application) updateFile(ctx context.Context, file File) error {
 
 	latestReleaseTag, err := file.releaseChecker.GetLatestReleaseTag(file.repo.ReleaseInfoURL)
 	if err != nil {
-		return err
+		app.warn(fmt.Sprintf("Failed to get the latest release tag for %s "+
+			"from github: %v. The file has not been updated.", fileName, err))
+		return nil
 	}
-	app.logger.Info.Printf("The latest release tag for %s: %s\n", fileName, latestReleaseTag)
+	app.logger.Info.Printf("The latest release tag for %s: %s\n",
+		fileName, latestReleaseTag)
 
 	app.logger.Info.Printf("Looking for %s file in %s...\n", fileName, fileDir)
 	var backup string
@@ -174,83 +180,124 @@ func (app *Application) updateFile(ctx context.Context, file File) error {
 		app.logger.Info.Printf("%s file found in %s\n", fileName, fileDir)
 		storedTag, err := getStoredReleaseTag(fileName, versionFilePath)
 		if err != nil {
-			return err
+			app.warn(fmt.Sprintf("Error while getting the local stored release tag "+
+				"for %s: %v. The file has not been updated.", fileName, err))
+			return nil
 		}
 
 		if storedTag == latestReleaseTag {
-			app.logger.Info.Printf("%s file is already up-to-date, no further action required\n", fileName)
+			app.logger.Info.Printf("%s file is already up-to-date (%s), "+
+				"no further action required\n", fileName, storedTag)
 			return nil
 		} else {
-			app.logger.Info.Printf("%s file is out-of-date, updating...\n", fileName)
+			app.logger.Info.Printf("%s file is out-of-date: local version is %s, "+
+				"remote version is %s, updating...\n",
+				fileName, storedTag, latestReleaseTag)
 			app.logger.Info.Println("Creating a backup file just in case...")
 			backup, err = utils.BackupFile(filePath)
 			if err != nil {
-				return err
+				app.warn(fmt.Sprintf("Failed to back up the file %s: %v. "+
+					"The file has not been updated.", fileName, err))
+				return nil
 			}
 			defer func() {
 				err = os.Remove(backup)
 				if err != nil {
-					app.logger.Info.Printf("could not remove the backup file by path %s: %v", backup, err)
+					app.warn(fmt.Sprintf("could not remove the backup file by path "+
+						"%s: %v", backup, err))
 				}
 			}()
 		}
 	} else {
-		app.logger.Info.Printf("%s file not found in %s, starting to download...\n", fileName, fileDir)
+		app.logger.Info.Printf("%s file not found in %s, starting to download...\n",
+			fileName, fileDir)
 	}
 
 	err = file.downloader.Download(filePath, file.repo.DownloadURL)
 	if err != nil {
-		return err
+		app.warn(fmt.Sprintf("Failed to download the file %s: %v. "+
+			"The file has not been updated.", fileName, err))
+		return nil
 	}
-	app.logger.Info.Printf("File downloaded and is available at %s\n", filePath)
+	app.logger.Info.Printf("File %s has been downloaded and is available at %s\n",
+		fileName, filePath)
 
 	fileIsZip, err := utils.IsZipFile(filePath)
 	if err != nil {
-		return err
+		app.warn(fmt.Sprintf("Failed to check whether the file %s is a zip file"+
+			"or not: %v. The file has not been updated.", fileName, err))
+		app.logger.Info.Printf("Restoring file %s from backup...", fileName)
+		if err := utils.RestoreFile(backup, filePath); err != nil {
+			return fmt.Errorf("failed to restore file %s from backup: %w",
+				fileName, err)
+		}
+		return nil
 	}
 	if fileIsZip {
-		app.logger.Info.Printf("The downloaded file %s is a zip, so unzipping it...\n", filepath.Base(filePath))
+		app.logger.Info.Printf("The downloaded file %s is a zip, so unzipping it...\n",
+			filepath.Base(filePath))
 		zipFilePath := filePath + ".zip"
 		err = os.Rename(filePath, zipFilePath)
 		if err != nil {
-			return err
+			app.warn(fmt.Sprintf("Failed to rename file %s to %s.zip: %v. "+
+				"The file has not been updated.", fileName, fileName, err))
+			return nil
 		}
 
 		extractedFilePath, err := utils.ExtractFileFromZip(zipFilePath, fileName)
 		if err != nil {
-			return err
+			app.warn(fmt.Sprintf("Failed to extract the necessary file %s "+
+				"from zip: %v. The file has not been updated.", fileName, err))
+			return nil
 		}
-		app.logger.Info.Printf("File extracted and is available at %s\n", extractedFilePath)
-		app.logger.Info.Printf("Removing the zip file %s\n", zipFilePath)
+		app.logger.Info.Printf("File %s has been extracted from zip "+
+			"and is available at %s\n", fileName, extractedFilePath)
 	}
 
 	// TODO: Test executability
 	if file.repo.Executable {
 		app.logger.Info.Printf("Setting executable permissions for %s\n", fileName)
 		if err := utils.MakeExecutable(filePath); err != nil {
-			app.logger.Error.Printf("Failed to set executable permissions for %s: %v\n", fileName, err)
-			app.logger.Error.Println("Restoring the backup file...")
-			err = utils.RestoreFile(backup, filePath)
-			return err
+			app.warn(fmt.Sprintf("Failed to set executable permissions for %s: %v. "+
+				"The file has not been updated. Restoring the file from backup...",
+				fileName, err))
+			if err := utils.RestoreFile(backup, filePath); err != nil {
+				return fmt.Errorf("failed to restore file %s from backup: %w",
+					fileName, err)
+			}
 		}
 	}
 
 	if !app.debug {
-		app.logger.Info.Println("Checking operability of xray after the file update...")
+		app.logger.Info.Printf("Checking operability of %s after the file update...\n",
+			app.xrayServiceName)
 		if err = utils.CheckOperability(ctx, app.xrayServiceName, nil); err != nil {
-			app.logger.Error.Printf("Something went wrong with the %s file update, restoring the backup file...\n", fileName)
-			err = utils.RestoreFile(backup, filePath)
-			return err
+			app.warn(fmt.Sprintf("Service %s operability check failed after the "+
+				"file %s has been updated, while it was operational prior to the "+
+				"update. All the changes to this file will now be reverted, "+
+				"and the original file will be restored from backup. The file has not "+
+				"been updated.", app.xrayServiceName, fileName))
+			if err := utils.RestoreFile(backup, filePath); err != nil {
+				return fmt.Errorf("failed to restore file %s from backup: %w",
+					fileName, err)
+			}
 		}
-
+		app.logger.Info.Printf("%s is active, updating the stored release tag...\n",
+			app.xrayServiceName)
+	} else {
+		app.logger.Info.Println("Updating the stored release tag...")
 	}
 
-	app.logger.Info.Println("Xray is active, updating the stored release tag...")
 	err = updateStoredReleaseTag(fileName, latestReleaseTag, versionFilePath)
 	if err != nil {
-		return err
+		app.warn(fmt.Sprintf("Failed to update the locally stored release tag "+
+			"of %s. This will lead to the need of a repeated update of %s the next "+
+			"time this app runs, and will likely fail again until the reason is "+
+			"investigated. However, the %s file update was NOT interrupted.",
+			fileName, fileName, fileName))
 	}
-	app.logger.Info.Printf("The %s file has been updated to version %s\n", fileName, latestReleaseTag)
+	app.logger.Info.Printf("The %s file has been successfully updated to version %s\n",
+		fileName, latestReleaseTag)
 
 	return nil
 }

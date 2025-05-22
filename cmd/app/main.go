@@ -19,6 +19,11 @@ type Application struct {
 	warnings        []string
 }
 
+func (app *Application) warn(txt string) {
+	app.logger.Warning.Println(txt)
+	app.warnings = append(app.warnings, txt)
+}
+
 func main() {
 	cfg, err := loadConfig()
 	if err != nil {
