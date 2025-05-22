@@ -44,8 +44,9 @@ func main() {
 	if err := utils.EnsureDir(cfg.Workdir); err != nil {
 		cfg.Messages.MainSender.Send(messages.Message{
 			Subject: "Error creating workdir",
-			Body:    fmt.Sprintf("Failed to create workdir %s: %v", cfg.Workdir, err),
-			Errors:  []error{err},
+			Body: fmt.Sprintf("Failed to create the main app workdir %s "+
+				"due to the following error:\n%v\nThe process stopped at this point "+
+				"and nothing else was done.", cfg.Workdir, err),
 		})
 		app.logger.Error.Fatalf("Error creating workdir: %v", err)
 	}
@@ -56,7 +57,6 @@ func main() {
 		cfg.Messages.MainSender.Send(messages.Message{
 			Subject: "Error updating files",
 			Body:    fmt.Sprintf("Failed to update the files: %v", err),
-			Errors:  []error{err},
 		})
 		app.logger.Error.Fatalf("Error updating files: %v", err)
 	}

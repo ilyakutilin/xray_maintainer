@@ -20,18 +20,30 @@ func (s *StreamSender) Send(msg Message) error {
 	fmt.Printf("Subject: %s\n", msg.Subject)
 	fmt.Printf("Body: %s\n", msg.Body)
 
-	errorsCount := len(msg.Errors)
-	switch errorsCount {
+	notesCount := len(msg.Notes)
+	switch notesCount {
 	case 0:
-		fmt.Println("There are no errors.")
 	case 1:
-		fmt.Printf("Error: %s\n", msg.Errors[0])
+		fmt.Printf("\nNote: %s\n", msg.Notes[0])
 	default:
-		fmt.Printf("There are %d errors:\n", errorsCount)
-		for i, err := range msg.Errors {
-			fmt.Printf("%d) %s\n", i, err)
+		fmt.Println("\nNotes:")
+		for i, note := range msg.Notes {
+			fmt.Printf("%d) %s\n", i, note)
 		}
 	}
+
+	warningsCount := len(msg.Warnings)
+	switch warningsCount {
+	case 0:
+	case 1:
+		fmt.Printf("\nWarning: %s\n", msg.Warnings[0])
+	default:
+		fmt.Println("\nWarnings:")
+		for i, warning := range msg.Warnings {
+			fmt.Printf("%d) %s\n", i, warning)
+		}
+	}
+
 	return nil
 }
 
