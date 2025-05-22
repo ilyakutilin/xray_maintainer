@@ -7,9 +7,10 @@ import (
 )
 
 type Logger struct {
-	Debug *log.Logger
-	Info  *log.Logger
-	Error *log.Logger
+	Debug   *log.Logger
+	Info    *log.Logger
+	Warning *log.Logger
+	Error   *log.Logger
 }
 
 func GetLogger(debug bool) *Logger {
@@ -22,8 +23,9 @@ func GetLogger(debug bool) *Logger {
 	}
 
 	return &Logger{
-		Debug: log.New(debugWriter, "DEBUG\t", log.Ldate|log.Ltime),
-		Info:  log.New(os.Stdout, "INFO\t", log.Ldate|log.Ltime),
-		Error: log.New(os.Stderr, "ERROR\t", log.Ldate|log.Ltime|log.Lshortfile),
+		Debug:   log.New(debugWriter, "DEBUG\t", log.Ldate|log.Ltime),
+		Info:    log.New(os.Stdout, "INFO\t", log.Ldate|log.Ltime),
+		Warning: log.New(os.Stdout, "WARNING\t", log.Ldate|log.Ltime),
+		Error:   log.New(os.Stderr, "ERROR\t", log.Ldate|log.Ltime|log.Lshortfile),
 	}
 }
