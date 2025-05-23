@@ -56,6 +56,8 @@ func GetRequestWithProxy(ctx context.Context, urlStr string, proxy *HTTPProxy) (
 				Proxy: http.ProxyURL(proxyURL),
 			},
 		}
+	} else {
+		client = &http.Client{}
 	}
 
 	client.Timeout = 10 * time.Second
