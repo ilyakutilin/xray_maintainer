@@ -84,12 +84,21 @@ func main() {
 	}
 
 	if len(app.notes) > 0 || len(app.warnings) > 0 {
+		var nw string
+		switch {
+		case len(app.notes) > 0 && len(app.warnings) == 0:
+			nw = "notes"
+		case len(app.notes) == 0 && len(app.warnings) > 0:
+			nw = "warnings"
+		case len(app.notes) > 0 && len(app.warnings) > 0:
+			nw = "notes and warnings"
+		}
 		app.sendMsg(
 			cfg.Messages,
-			"Success with notes and/or warnings.",
-			"The xray related files and its warp config have been successfully "+
-				"checked and updated as necessary, however there are some notes "+
-				"and/or warnings:",
+			fmt.Sprintf("Completed with %s.", nw),
+			fmt.Sprintf("The xray related files and its warp config have been "+
+				"successfully checked and updated as necessary, however there are "+
+				"some %s:", nw),
 		)
 	}
 }
