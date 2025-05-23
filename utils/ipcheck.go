@@ -1,7 +1,12 @@
 package utils
 
 import (
+	"context"
+	"fmt"
 	"net"
+	"regexp"
+	"strings"
+	"time"
 )
 
 func IsValidIPOrCIDR(ipStr string) bool {
@@ -82,4 +87,23 @@ func isReserved(ip net.IP) bool {
 		return true
 	}
 	return false
+}
+
+func GetCountryCode(ctx context.Context) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	resp, err := GetRequestWithProxy(
+		ctx, "http://ip-api.com/line/?fields=countryCode", nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to obtain the country information: %w", err)
+	}
+	countryCode := strings.Replace(string(resp), "\n", "", -1)
+
+	isValidCountryCode, _ := regexp.MatchString(`^[A-Z]{2}$`, string(countryCode))
+	if !isValidCountryCode {
+		return "", fmt.Errorf("%s is not a valid ISO 3166-1 alpha-2 country code",
+			countryCode)
+	}
+
+	return string(countryCode), nil
 }
