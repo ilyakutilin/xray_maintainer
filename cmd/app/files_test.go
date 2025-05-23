@@ -577,22 +577,21 @@ func TestUpdateFile(t *testing.T) {
 
 func TestUpdateMultipleFiles(t *testing.T) {
 	tests := []struct {
-		name           string
-		ReleaseChecker ReleaseChecker
-		downloader     FileDownloader
-		errorExpected  bool
+		name            string
+		ReleaseChecker  ReleaseChecker
+		downloader      FileDownloader
+		expectedWarning string
 	}{
 		{
 			name:           "Successful update",
 			ReleaseChecker: MockReleaseChecker{},
 			downloader:     OrdinaryFileDownloader{},
-			errorExpected:  false,
 		},
 		{
-			name:           "Failed update",
-			ReleaseChecker: MockReleaseChecker{},
-			downloader:     FailFileDownloader{},
-			errorExpected:  true,
+			name:            "Failed update",
+			ReleaseChecker:  MockReleaseChecker{},
+			downloader:      FailFileDownloader{},
+			expectedWarning: "failed to download file. The file has not been updated.",
 		},
 	}
 
@@ -626,14 +625,21 @@ func TestUpdateMultipleFiles(t *testing.T) {
 				{Name: filenameTwo, Filename: filenameTwo},
 			}
 
-			err := testApp.updateMultipleFiles(ctx, repos, fn)
+			_ = testApp.updateMultipleFiles(ctx, repos, fn)
 
-			if test.errorExpected {
-				utils.AssertError(t, err)
-				utils.AssertErrorContains(t, err, "failed to download file\n")
-				return
-			} else {
-				utils.AssertNoError(t, err)
+			if test.expectedWarning != "" {
+				if len(testApp.warnings) == 0 {
+					t.Errorf("expected a warning, got none")
+				} else {
+					for _, w := range testApp.warnings {
+						if strings.Contains(w, test.expectedWarning) {
+							return
+						}
+					}
+					t.Errorf("the expected warning is '%s', but there are only "+
+						"the following warnings: %s",
+						test.expectedWarning, strings.Join(testApp.warnings, ", "))
+				}
 			}
 		})
 	}

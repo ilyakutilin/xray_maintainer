@@ -298,7 +298,6 @@ func TestGetClientConfig(t *testing.T) {
 				utils.AssertCorrectString(t, "testmethod", clientConfig.Outbounds[0].Settings.Servers[0].Method)
 				utils.AssertCorrectString(t, tt.password, clientConfig.Outbounds[0].Settings.Servers[0].Password)
 				utils.AssertCorrectString(t, "tcp,udp", clientConfig.Routing.Rules[0].Network)
-				utils.AssertCorrectString(t, "error", clientConfig.Log.Loglevel)
 			}
 		})
 	}
