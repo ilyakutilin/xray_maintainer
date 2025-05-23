@@ -40,8 +40,12 @@ func main() {
 	defer func() {
 		if r := recover(); r != nil {
 			stack := debug.Stack()
+			app.sendMsg(
+				cfg.Messages,
+				"App panicked",
+				fmt.Sprintf("Panic in the app:\n%v\n%s", r, stack),
+			)
 			app.logger.Error.Printf("PANIC: %v\n%s", r, stack)
-			// TODO: Send a message with the panic info
 			os.Exit(1)
 		}
 	}()
@@ -69,20 +73,23 @@ func main() {
 		app.logger.Error.Fatalf("Error updating files: %v", err)
 	}
 
-	// TODO: Add error handling
 	err = app.updateWarp(ctx, cfg.Xray)
 	if err != nil {
+		app.sendMsg(
+			cfg.Messages,
+			"Error updating the warp config",
+			fmt.Sprintf("Failed to update the warp config: %v", err),
+		)
 		app.logger.Error.Fatalf("Error updating warp config: %v", err)
 	}
 
-	// // TODO: Add error handling
-	// _ = RestartService("xray")
-	// xrayActive, _ := utils.CheckServiceStatus("xray")
-	// if !xrayActive {
-	// 	log.Fatal("XRay service failed to start")
-	// }
-
-	// TODO: Remove print stmt
-	// fmt.Println(cfg.Workdir)
-	// fmt.Println(cfg.Xray.Server.IP)
+	if len(app.notes) > 0 || len(app.warnings) > 0 {
+		app.sendMsg(
+			cfg.Messages,
+			"Success with notes and/or warnings.",
+			"The xray related files and its warp config have been successfully "+
+				"checked and updated as necessary, however there are some notes "+
+				"and/or warnings:",
+		)
+	}
 }
