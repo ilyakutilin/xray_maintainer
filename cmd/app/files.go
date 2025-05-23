@@ -49,7 +49,7 @@ func getStoredReleaseTag(fileName string, versionFilePath string) (string, error
 
 	var versions map[string]string
 	if err := json.Unmarshal(data, &versions); err != nil {
-		return "", fmt.Errorf("failed to unmarshal the versions file: %w", err)
+		return "", err
 	}
 
 	version, exists := versions[fileName]

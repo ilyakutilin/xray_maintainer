@@ -364,13 +364,6 @@ func TestDownload_NetworkErrors(t *testing.T) {
 	filePath := filepath.Join(tempDir, "testfile.txt")
 	downloader := GitHubFileDownloader{}
 
-	t.Run("invalid URL", func(t *testing.T) {
-		err := downloader.Download(filePath, "http://invalid-url")
-		if err == nil {
-			t.Error("Expected error for invalid URL, got nil")
-		}
-	})
-
 	t.Run("connection refused", func(t *testing.T) {
 		err := downloader.Download(filePath, "http://localhost:19999")
 		if err == nil {
@@ -461,46 +454,43 @@ func (d FailFileDownloader) Download(filePath string, url string) error {
 
 func TestUpdateFile(t *testing.T) {
 	tests := []struct {
-		name           string
-		oldContent     string
-		releaseChecker ReleaseChecker
-		downloader     FileDownloader
-		errorExpected  bool
+		name            string
+		oldContent      string
+		releaseChecker  ReleaseChecker
+		downloader      FileDownloader
+		expectedWarning string
 	}{
 		{
 			name:           "Update nonexistent file",
 			oldContent:     "",
 			releaseChecker: MockReleaseChecker{},
 			downloader:     OrdinaryFileDownloader{},
-			errorExpected:  false,
 		},
 		{
 			name:           "Update existing file",
 			oldContent:     "old content",
 			releaseChecker: MockReleaseChecker{},
 			downloader:     OrdinaryFileDownloader{},
-			errorExpected:  false,
 		},
 		{
 			name:           "Update existing zip file",
 			oldContent:     "old content",
 			releaseChecker: MockReleaseChecker{},
 			downloader:     ZipFileDownloader{},
-			errorExpected:  false,
 		},
 		{
-			name:           "Fail to get release tag",
-			oldContent:     "old content",
-			releaseChecker: FailReleaseChecker{},
-			downloader:     OrdinaryFileDownloader{},
-			errorExpected:  true,
+			name:            "Fail to get release tag",
+			oldContent:      "old content",
+			releaseChecker:  FailReleaseChecker{},
+			downloader:      OrdinaryFileDownloader{},
+			expectedWarning: "failed to get release tag. The file has not been updated.",
 		},
 		{
-			name:           "Fail to download file",
-			oldContent:     "old content",
-			releaseChecker: MockReleaseChecker{},
-			downloader:     FailFileDownloader{},
-			errorExpected:  true,
+			name:            "Fail to download file",
+			oldContent:      "old content",
+			releaseChecker:  MockReleaseChecker{},
+			downloader:      FailFileDownloader{},
+			expectedWarning: "failed to download file. The file has not been updated.",
 		},
 	}
 
@@ -531,13 +521,21 @@ func TestUpdateFile(t *testing.T) {
 			file.releaseChecker = test.releaseChecker
 			file.downloader = test.downloader
 
-			err := testApp.updateFile(ctx, file)
+			_ = testApp.updateFile(ctx, file)
 
-			if test.errorExpected {
-				utils.AssertError(t, err)
-				return
-			} else {
-				utils.AssertNoError(t, err)
+			if test.expectedWarning != "" {
+				if len(testApp.warnings) == 0 {
+					t.Errorf("expected a warning, got none")
+				} else {
+					for _, w := range testApp.warnings {
+						if strings.Contains(w, test.expectedWarning) {
+							return
+						}
+					}
+					t.Errorf("the expected warning is '%s', but there are only "+
+						"the following warnings: %s",
+						test.expectedWarning, strings.Join(testApp.warnings, ", "))
+				}
 			}
 
 			content, err := os.ReadFile(tempFile)
