@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"time"
 )
 
 // Checks if the app has sudo privileges
@@ -20,6 +21,9 @@ func CheckSudo() error {
 
 // Runs a shell command and returns its output or an error.
 func ExecuteCommand(ctx context.Context, cmdStr string) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
 	cmd := exec.CommandContext(ctx, "bash", "-c", cmdStr)
 
 	var out bytes.Buffer
