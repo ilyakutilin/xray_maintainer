@@ -16,6 +16,7 @@ import (
 type XrayServer struct {
 	IP             string `koanf:"ip"`
 	ServiceName    string `koanf:"service_name"`
+	ConfigFileName string `koanf:"config_filename"`
 	ConfigFilePath string
 }
 
@@ -25,6 +26,7 @@ type XrayClient struct {
 	ServerProtocol string
 	Port           int    `koanf:"port"`
 	IPCheckerURL   string `koanf:"ip_checker_url"`
+	ConfigFileName string `koanf:"config_filename"`
 	ConfigFilePath string
 }
 
@@ -64,12 +66,14 @@ var defaults = Config{
 	Xray: Xray{
 		Server: XrayServer{
 			// No default for Server IP as it shall be explicitly set by the user
-			IP: "",
+			IP:             "",
+			ConfigFileName: "server-config.json",
 		},
 		Client: XrayClient{
 			ServerProtocol: "shadowsocks",
 			Port:           10801,
 			IPCheckerURL:   "http://ip-api.com/json/?fields=status,message,isp,org,query",
+			ConfigFileName: "client-config.json",
 		},
 	},
 	Repos: []Repo{
@@ -153,8 +157,8 @@ func loadConfig() (*Config, error) {
 		return nil, fmt.Errorf("error expanding the workdir path: %w", err)
 	}
 
-	cfg.Xray.Server.ConfigFilePath = filepath.Join(cfg.Workdir, "server-config.json")
-	cfg.Xray.Client.ConfigFilePath = filepath.Join(cfg.Workdir, "client-config.json")
+	cfg.Xray.Server.ConfigFilePath = filepath.Join(cfg.Workdir, cfg.Xray.Server.ConfigFileName)
+	cfg.Xray.Client.ConfigFilePath = filepath.Join(cfg.Workdir, cfg.Xray.Client.ConfigFileName)
 
 	xrayExecutableFileName, err := findFilenameInRepo(cfg.Repos, "xray-core")
 	if err != nil {

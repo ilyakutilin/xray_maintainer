@@ -6,9 +6,11 @@ xray:
   server:
     ip: 123.234.123.234
     service_name: xray.service
+    config_filename: server-config.json
   client:
     port: 10801
     ip_checker_url: 'http://ip-api.com/json/?fields=status,message,isp,org,query'
+    config_filename: client-config.json
 
 repos:
   - name: geoip
