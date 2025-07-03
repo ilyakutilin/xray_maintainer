@@ -67,6 +67,7 @@ var defaults = Config{
 		Server: XrayServer{
 			// No default for Server IP as it shall be explicitly set by the user
 			IP:             "",
+			ServiceName:    "xray.service",
 			ConfigFileName: "server-config.json",
 		},
 		Client: XrayClient{
