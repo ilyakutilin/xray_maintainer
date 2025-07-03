@@ -23,7 +23,7 @@ repos:
     download_url: 'https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat'
     filename: geosite.dat
     executable: false
-  - name: xray_core
+  - name: xray-core
     release_info_url: 'https://api.github.com/repos/XTLS/Xray-core/releases/latest'
     download_url: 'https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip'
     filename: xray
