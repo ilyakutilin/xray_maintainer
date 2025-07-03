@@ -16,6 +16,7 @@ import (
 type XrayServer struct {
 	IP             string `koanf:"ip"`
 	ServiceName    string `koanf:"service_name"`
+	ConfigFileName string `koanf:"config_filename"`
 	ConfigFilePath string
 }
 
@@ -25,6 +26,7 @@ type XrayClient struct {
 	ServerProtocol string
 	Port           int    `koanf:"port"`
 	IPCheckerURL   string `koanf:"ip_checker_url"`
+	ConfigFileName string `koanf:"config_filename"`
 	ConfigFilePath string
 }
 
@@ -59,17 +61,20 @@ type Config struct {
 }
 
 var defaults = Config{
-	Debug:   true,
-	Workdir: "/opt/xray/",
+	Debug:   false,
+	Workdir: ".",
 	Xray: Xray{
 		Server: XrayServer{
 			// No default for Server IP as it shall be explicitly set by the user
-			IP: "",
+			IP:             "",
+			ServiceName:    "xray.service",
+			ConfigFileName: "config.json",
 		},
 		Client: XrayClient{
 			ServerProtocol: "shadowsocks",
 			Port:           10801,
 			IPCheckerURL:   "http://ip-api.com/json/?fields=status,message,isp,org,query",
+			ConfigFileName: "client-config.json",
 		},
 	},
 	Repos: []Repo{
@@ -82,8 +87,8 @@ var defaults = Config{
 		},
 		{
 			Name:           "geosite",
-			ReleaseInfoURL: "https://api.github.com/repos/v2fly/geoip/releases/latest",
-			DownloadURL:    "https://github.com/v2fly/geoip/releases/latest/download/geoip.dat",
+			ReleaseInfoURL: "https://api.github.com/repos/v2fly/domain-list-community/releases/latest",
+			DownloadURL:    "https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat",
 			Filename:       "geosite.dat",
 			Executable:     false,
 		},
@@ -153,8 +158,8 @@ func loadConfig() (*Config, error) {
 		return nil, fmt.Errorf("error expanding the workdir path: %w", err)
 	}
 
-	cfg.Xray.Server.ConfigFilePath = filepath.Join(cfg.Workdir, "server-config.json")
-	cfg.Xray.Client.ConfigFilePath = filepath.Join(cfg.Workdir, "client-config.json")
+	cfg.Xray.Server.ConfigFilePath = filepath.Join(cfg.Workdir, cfg.Xray.Server.ConfigFileName)
+	cfg.Xray.Client.ConfigFilePath = filepath.Join(cfg.Workdir, cfg.Xray.Client.ConfigFileName)
 
 	xrayExecutableFileName, err := findFilenameInRepo(cfg.Repos, "xray-core")
 	if err != nil {
@@ -176,11 +181,15 @@ func loadConfig() (*Config, error) {
 	var validSenders []messages.Sender
 
 	for _, sender := range rawSenders {
-		if err := sender.Validate(); err != nil {
-			return nil, fmt.Errorf("the sender failed validation and will not be "+
-				"included in the senders list: %w", err)
+		// TODO: Currently if the validation of the sender fails, it fails silently.
+		// This is because the config is loaded before the logging (since the logging
+		// depends on the config). But the failure must be registered somehow somewhere.
+		if err := sender.Validate(); err == nil {
+			validSenders = append(validSenders, sender)
 		}
-		validSenders = append(validSenders, sender)
+	}
+	if validSenders == nil {
+		validSenders = append(validSenders, &cfg.Messages.StreamSender)
 	}
 	cfg.Messages.MainSender = messages.CompositeSender{
 		Senders: validSenders,

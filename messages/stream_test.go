@@ -2,6 +2,7 @@ package messages
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"testing"
 )
@@ -65,8 +66,8 @@ Subject: Test Subject
 Body: Test Body
 
 Notes:
-0) First Note
-1) Second Note
+1) First Note
+2) Second Note
 `,
 		},
 		{
@@ -95,8 +96,8 @@ Subject: Test Subject
 Body: Test Body
 
 Warnings:
-0) First Warning
-1) Second Warning
+1) First Warning
+2) Second Warning
 `,
 		},
 		{
@@ -112,8 +113,8 @@ Subject: Test Subject
 Body: Test Body
 
 Notes:
-0) First Note
-1) Second Note
+1) First Note
+2) Second Note
 
 Warning: Test Warning
 `,
@@ -133,8 +134,8 @@ Body: Test Body
 Note: Test Note
 
 Warnings:
-0) First Warning
-1) Second Warning
+1) First Warning
+2) Second Warning
 `,
 		},
 		{
@@ -150,24 +151,38 @@ Subject: Test Subject
 Body: Test Body
 
 Notes:
-0) First Note
-1) Second Note
+1) First Note
+2) Second Note
 
 Warnings:
-0) First Warning
-1) Second Warning
+1) First Warning
+2) Second Warning
 `,
 		},
 		{
-			name: "empty message",
+			name: "empty subject",
 			message: Message{
-				Subject: "",
-				Body:    "",
+				Body: "Test Body",
 			},
 			expected: `The following message would be sent:
-Subject: 
-Body: 
+Subject: [empty subject]
+Body: Test Body
 `,
+		},
+		{
+			name: "empty body",
+			message: Message{
+				Subject: "Test Subject",
+			},
+			expected: `The following message would be sent:
+Subject: Test Subject
+Body: [empty body]
+`,
+		},
+		{
+			name:     "empty message",
+			message:  Message{},
+			expected: "",
 		},
 	}
 
@@ -182,7 +197,7 @@ Body:
 			})
 
 			if output != tt.expected {
-				t.Errorf("unexpected output:\ngot:\n%v\nwant:\n%v", output, tt.expected)
+				t.Errorf("unexpected output:\ngot:\n%v\nwant:\n%v", fmt.Sprintf("%q\n", output), fmt.Sprintf("%q\n", tt.expected))
 			}
 		})
 	}

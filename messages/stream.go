@@ -16,32 +16,9 @@ type StreamSender struct{}
 // Returns:
 //   - error: Always returns nil as this implementation does not perform actual sending.
 func (s *StreamSender) Send(msg Message) error {
-	fmt.Println("The following message would be sent:")
-	fmt.Printf("Subject: %s\n", msg.Subject)
-	fmt.Printf("Body: %s\n", msg.Body)
-
-	notesCount := len(msg.Notes)
-	switch notesCount {
-	case 0:
-	case 1:
-		fmt.Printf("\nNote: %s\n", msg.Notes[0])
-	default:
-		fmt.Println("\nNotes:")
-		for i, note := range msg.Notes {
-			fmt.Printf("%d) %s\n", i, note)
-		}
-	}
-
-	warningsCount := len(msg.Warnings)
-	switch warningsCount {
-	case 0:
-	case 1:
-		fmt.Printf("\nWarning: %s\n", msg.Warnings[0])
-	default:
-		fmt.Println("\nWarnings:")
-		for i, warning := range msg.Warnings {
-			fmt.Printf("%d) %s\n", i, warning)
-		}
+	if msg.String() != "" {
+		fmt.Println("The following message would be sent:")
+		fmt.Printf("%s", msg)
 	}
 
 	return nil

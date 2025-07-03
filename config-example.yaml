@@ -6,9 +6,11 @@ xray:
   server:
     ip: 123.234.123.234
     service_name: xray.service
+    config_filename: server-config.json
   client:
     port: 10801
     ip_checker_url: 'http://ip-api.com/json/?fields=status,message,isp,org,query'
+    config_filename: client-config.json
 
 repos:
   - name: geoip
@@ -21,7 +23,7 @@ repos:
     download_url: 'https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat'
     filename: geosite.dat
     executable: false
-  - name: xray_core
+  - name: xray-core
     release_info_url: 'https://api.github.com/repos/XTLS/Xray-core/releases/latest'
     download_url: 'https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip'
     filename: xray

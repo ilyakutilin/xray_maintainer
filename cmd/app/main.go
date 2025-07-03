@@ -7,7 +7,6 @@ import (
 	"os"
 	"runtime/debug"
 
-	"github.com/ilyakutilin/xray_maintainer/messages"
 	"github.com/ilyakutilin/xray_maintainer/utils"
 )
 
@@ -16,6 +15,18 @@ type Application struct {
 	logger          *Logger
 	workdir         string
 	xrayServiceName string
+	notes           []string
+	warnings        []string
+}
+
+func (app *Application) note(txt string) {
+	app.logger.Info.Println(txt)
+	app.warnings = append(app.notes, txt)
+}
+
+func (app *Application) warn(txt string) {
+	app.logger.Warning.Println(txt)
+	app.warnings = append(app.warnings, txt)
 }
 
 func main() {
@@ -34,47 +45,71 @@ func main() {
 	defer func() {
 		if r := recover(); r != nil {
 			stack := debug.Stack()
+			app.sendMsg(
+				cfg.Messages,
+				"App panicked",
+				fmt.Sprintf("Panic in the app:\n%v\n%s", r, stack),
+			)
 			app.logger.Error.Printf("PANIC: %v\n%s", r, stack)
-			// TODO: Send a message with the panic info
 			os.Exit(1)
 		}
 	}()
 
+	if !app.debug {
+		if err := utils.CheckSudo(); err != nil {
+			app.logger.Error.Fatal(err)
+		}
+	}
+
 	// Check if the workdir exists, if not create it
 	if err := utils.EnsureDir(cfg.Workdir); err != nil {
-		cfg.Messages.MainSender.Send(messages.Message{
-			Subject: "Error creating workdir",
-			Body: fmt.Sprintf("Failed to create the main app workdir %s "+
+		app.sendMsg(
+			cfg.Messages,
+			"Error creating workdir",
+			fmt.Sprintf("Failed to create the main app workdir %s "+
 				"due to the following error:\n%v\nThe process stopped at this point "+
 				"and nothing else was done.", cfg.Workdir, err),
-		})
+		)
 		app.logger.Error.Fatalf("Error creating workdir: %v", err)
 	}
 
 	ctx := context.Background()
 
 	if err := app.updateMultipleFiles(ctx, cfg.Repos, NewFile); err != nil {
-		cfg.Messages.MainSender.Send(messages.Message{
-			Subject: "Error updating files",
-			Body:    fmt.Sprintf("Failed to update the files: %v", err),
-		})
+		app.sendMsg(
+			cfg.Messages,
+			"Error updating files",
+			fmt.Sprintf("Failed to update the files: %v", err),
+		)
 		app.logger.Error.Fatalf("Error updating files: %v", err)
 	}
 
-	// TODO: Add error handling
 	err = app.updateWarp(ctx, cfg.Xray)
 	if err != nil {
+		app.sendMsg(
+			cfg.Messages,
+			"Error updating the warp config",
+			fmt.Sprintf("Failed to update the warp config: %v", err),
+		)
 		app.logger.Error.Fatalf("Error updating warp config: %v", err)
 	}
 
-	// // TODO: Add error handling
-	// _ = RestartService("xray")
-	// xrayActive, _ := utils.CheckServiceStatus("xray")
-	// if !xrayActive {
-	// 	log.Fatal("XRay service failed to start")
-	// }
-
-	// TODO: Remove print stmt
-	// fmt.Println(cfg.Workdir)
-	// fmt.Println(cfg.Xray.Server.IP)
+	if len(app.notes) > 0 || len(app.warnings) > 0 {
+		var nw string
+		switch {
+		case len(app.notes) > 0 && len(app.warnings) == 0:
+			nw = "notes"
+		case len(app.notes) == 0 && len(app.warnings) > 0:
+			nw = "warnings"
+		case len(app.notes) > 0 && len(app.warnings) > 0:
+			nw = "notes and warnings"
+		}
+		app.sendMsg(
+			cfg.Messages,
+			fmt.Sprintf("Completed with %s.", nw),
+			fmt.Sprintf("The xray related files and its warp config have been "+
+				"successfully checked and updated as necessary, however there are "+
+				"some %s:", nw),
+		)
+	}
 }

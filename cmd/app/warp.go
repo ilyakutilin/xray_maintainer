@@ -33,8 +33,22 @@ public_key: ZZZZ0000/FAKEYFAK+12345678/DEMODEMO==TEST
 client_id: a1o2
 reserved: [ 100, 200, 300 ]
 v4: 172.16.0.2
-v6: dead:beef:0000:fake:1234:cafe:feed:0001
+v6: 2001:db8::1
 endpoint: engage.cloudflareclient.com:2408`, nil
+	}
+
+	countryCode, err := utils.GetCountryCode(ctx)
+	if err != nil {
+		app.warn(fmt.Sprintf("Failed to get the country that the request for "+
+			"the Cloudflare credentials originates from: %v. If such a request hits a "+
+			"region block, the request will timed out. This does not prevent further "+
+			"execution and the request will be sent anyway.", err))
+	}
+	if countryCode == "RU" {
+		return "", errors.New("the Clouflare credentials generator has been " +
+			"launched from Russia. This will inevitably result in the request timeout" +
+			"due to a region block, so there is no point in trying. Warp update " +
+			"process will now be terminated")
 	}
 
 	return utils.ExecuteCommand(ctx, cfCredFilePath)
@@ -201,23 +215,27 @@ func (app *Application) isWarpOK(ctx context.Context, xray Xray) (bool, error) {
 
 	if err := waitForXrayReady(ctx, ready, xray.Client.Port); err != nil {
 		terminateProcess(cmd)
-		return false, err
+		return false, fmt.Errorf("xray verification client failed to start: %w", err)
 	}
 
-	app.logger.Info.Println("xray started successfully. Performing IP info request...")
+	app.logger.Info.Println("xray started successfully. Requesting a detailed " +
+		"information about the IP address and the provider...")
 	proxy := utils.HTTPProxy{IP: "127.0.0.1", Port: xray.Client.Port}
 	apiResponse, err := utils.GetRequestWithProxy(ctx, xray.Client.IPCheckerURL, &proxy)
 
 	if err != nil {
 		terminateProcess(cmd)
-		return false, fmt.Errorf("failed to fetch the warp status JSON from the ip checker API: %w", err)
+		return false, nil
 	}
 
-	app.logger.Info.Println("sending SIGTERM to the xray verification client...")
+	app.logger.Info.Println("Response received, shutting down the xray verification " +
+		"client...")
 	if err := terminateProcess(cmd); err != nil {
 		return false, err
 	}
 
+	app.logger.Info.Println("Analyzing the response to make sure that the provider " +
+		"is Cloudflare...")
 	if err := checkIPCheckerResponse(apiResponse, xray.Server.IP); err != nil {
 		return false, nil
 	}
@@ -251,7 +269,7 @@ func updateServerWarpConfig(xrayServerConfig *ServerConfig, cfCreds *CFCreds) er
 }
 
 func (app *Application) updateWarp(ctx context.Context, xray Xray) error {
-	app.logger.Info.Println("Updating warp config...")
+	app.logger.Info.Println("Checking whether the warp is operational...")
 
 	// Parse the existing xray server config
 	app.logger.Info.Println("Parsing the existing xray server config...")
@@ -261,51 +279,52 @@ func (app *Application) updateWarp(ctx context.Context, xray Xray) error {
 	}
 	app.logger.Info.Println("Successfully parsed xray server config.")
 
+	app.logger.Info.Println("Validating xray server config...")
 	if err := xrayServerConfig.Validate(); err != nil {
 		return fmt.Errorf("the parsed xray server config failed validation: %w", err)
 	}
+	app.logger.Info.Println("Xray server config successfuly passed validation.")
 
 	// Get the client config and verify that warp is active
+	app.logger.Info.Println("Generating a config for the temporary warp verification " +
+		"xray client...")
 	clientConfig := getClientConfig(&xray.Client, &xray.Server, &xrayServerConfig)
 	if err := utils.WriteStructToJSONFile(clientConfig, xray.Client.ConfigFilePath); err != nil {
 		return fmt.Errorf("error writing client config to %q: %w", xray.Client.ConfigFilePath, err)
 	}
-	app.logger.Info.Println("Successfully wrote client config to file.")
-	app.logger.Info.Println("Starting to check if the warp is active and responsive...")
+	app.logger.Info.Println("Client config has successfully been generated " +
+		"and saved to a file in the main working directory.")
+	app.logger.Info.Println("Starting to check if the warp is active and responsive " +
+		"using the temporary verification client...")
 	warpOK, err := app.isWarpOK(ctx, xray)
 	if err != nil {
 		return fmt.Errorf("failed to obtain the warp status: %w", err)
 	}
-
-	// TODO: Remove this line
-	warpOK = !warpOK
 
 	if warpOK {
 		app.logger.Info.Println("Warp is active, so its update is not required.")
 		return nil
 	}
 
-	app.logger.Error.Println("Warp is not active, so its update is required.")
+	app.logger.Warning.Println("Warp is not active, so its update is required.")
 
-	// TODO: Launch the CF cred generator, parse the output,
-	// write new values to the struct, and then write the struct to the json
-
-	// Launch Cloudflare credential generator and capture its output
-	// TODO: At this point it just freezes. Check how the generator launches and what it does.
+	app.logger.Info.Println("Launching Cloudflare credential generator to capture " +
+		"its output")
 	cfCredOutput, err := app.getCFCreds(ctx, xray.CFCredFilePath)
 	if err != nil {
 		return fmt.Errorf("error while launching the Cloudflare credentials "+
 			"generator: %w", err)
 	}
 
-	// Parse the Cloudflare credential generator output into a struct
+	app.logger.Info.Println("Obtained the Cloudflare credentials, parsing...")
 	cfCreds, err := parseCFCreds(cfCredOutput)
 	if err != nil {
 		return fmt.Errorf("error while parsing the generated Cloudflare "+
 			"credentials: %w", err)
 	}
 
-	app.logger.Info.Println("Updating the xray server config with new Warp settings...")
+	app.logger.Info.Println("Successfully parsed the credentials. Updating the xray " +
+		"server config with new Warp settings...")
 	if err := updateServerWarpConfig(&xrayServerConfig, &cfCreds); err != nil {
 		return fmt.Errorf("error updating the xray server config: %w", err)
 	}
@@ -337,9 +356,12 @@ func (app *Application) updateWarp(ctx context.Context, xray Xray) error {
 					"is required: %w", err)
 			}
 		}
-		app.logger.Info.Println("Xray service is operational with the updated config.")
-		app.logger.Info.Println("This was a triumph.")
-		app.logger.Info.Println("I'm making a note here: 'HUGE SUCCESS'")
+		_ = os.Remove(srvBackupFile)
+		app.note(fmt.Sprintf("Warp config was corrput. It was updated and now"+
+			"the %s is operational with the updated server config.", app.xrayServiceName))
+	} else {
+		_ = os.Remove(srvBackupFile)
+		app.logger.Info.Printf("The app is in debug mode, so the %s will not be restarted.", app.xrayServiceName)
 	}
 
 	return nil

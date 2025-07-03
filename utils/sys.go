@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
+	"time"
 )
 
 // Checks if the app has sudo privileges
@@ -20,6 +22,9 @@ func CheckSudo() error {
 
 // Runs a shell command and returns its output or an error.
 func ExecuteCommand(ctx context.Context, cmdStr string) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
 	cmd := exec.CommandContext(ctx, "bash", "-c", cmdStr)
 
 	var out bytes.Buffer
@@ -56,11 +61,18 @@ func CheckServiceStatus(ctx context.Context, serviceName string, executor Comman
 		executor = defaultExecutor
 	}
 
-	output, err := executor(ctx, fmt.Sprintf("systemctl is-active %s", serviceName))
-	if err != nil {
-		return false, err
+	for range 5 {
+		output, err := executor(ctx, fmt.Sprintf("systemctl is-active %s", serviceName))
+		if err != nil {
+			return false, err
+		}
+		if strings.ReplaceAll(output, "\n", "") != "active" {
+			time.Sleep(1 * time.Second)
+		} else {
+			return true, nil
+		}
 	}
-	return output == "active", nil
+	return false, nil
 }
 
 func CheckOperability(ctx context.Context, serviceName string, executor CommandExecutor) error {

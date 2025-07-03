@@ -1,12 +1,93 @@
 package messages
 
-import "github.com/ilyakutilin/xray_maintainer/utils"
+import (
+	"fmt"
+	"strings"
+
+	"github.com/ilyakutilin/xray_maintainer/utils"
+)
 
 type Message struct {
 	Subject  string
 	Body     string
 	Notes    []string
 	Warnings []string
+}
+
+func (m Message) getFullBody(html bool) string {
+	var bs []string
+
+	if m.Body != "" {
+		bs = append(bs, m.Body)
+	}
+
+	var opTag string
+	var clTag string
+
+	if html {
+		opTag = "<b>"
+		clTag = "</b>"
+	}
+
+	notesCount := len(m.Notes)
+	switch notesCount {
+	case 0:
+	case 1:
+		bs = append(bs, fmt.Sprintf("%sNote%s: %s", opTag, clTag, m.Notes[0]))
+	default:
+		var notes []string
+		notes = append(notes, fmt.Sprintf("%sNotes%s:", opTag, clTag))
+		for i, note := range m.Notes {
+			notes = append(notes, fmt.Sprintf("%s%d)%s %s", opTag, i+1, clTag, note))
+		}
+		bs = append(bs, strings.Join(notes, "\n"))
+	}
+
+	warningsCount := len(m.Warnings)
+	switch warningsCount {
+	case 0:
+	case 1:
+		bs = append(bs, fmt.Sprintf("%sWarning%s: %s", opTag, clTag, m.Warnings[0]))
+	default:
+		var warnings []string
+		warnings = append(warnings, fmt.Sprintf("%sWarnings%s:", opTag, clTag))
+		for i, warning := range m.Warnings {
+			warnings = append(warnings, fmt.Sprintf("%s%d)%s %s", opTag, i+1, clTag, warning))
+		}
+		bs = append(bs, strings.Join(warnings, "\n"))
+	}
+
+	res := strings.Join(bs, "\n\n")
+
+	if res != "" && res[len(res)-1] != '\n' {
+		res += "\n"
+	}
+	return res
+}
+
+func (m Message) GetFullBodyText() string {
+	return m.getFullBody(false)
+}
+
+func (m Message) GetFullBodyHTML() string {
+	return m.getFullBody(true)
+}
+
+func (m Message) String() string {
+	if m.Subject == "" && m.Body == "" {
+		return ""
+	}
+
+	if m.Subject == "" {
+		m.Subject = "[empty subject]"
+	}
+
+	if m.Body == "" {
+		m.Body = "[empty body]"
+	}
+
+	return fmt.Sprintf("Subject: %s\n", m.Subject) +
+		fmt.Sprintf("Body: %s", m.GetFullBodyText())
 }
 
 type Sender interface {
