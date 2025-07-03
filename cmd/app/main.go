@@ -50,6 +50,12 @@ func main() {
 		}
 	}()
 
+	if !app.debug {
+		if err := utils.CheckSudo(); err != nil {
+			app.logger.Error.Fatal(err)
+		}
+	}
+
 	// Check if the workdir exists, if not create it
 	if err := utils.EnsureDir(cfg.Workdir); err != nil {
 		app.sendMsg(
