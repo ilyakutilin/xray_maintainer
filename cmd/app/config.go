@@ -61,14 +61,14 @@ type Config struct {
 }
 
 var defaults = Config{
-	Debug:   true,
-	Workdir: "/opt/xray/",
+	Debug:   false,
+	Workdir: ".",
 	Xray: Xray{
 		Server: XrayServer{
 			// No default for Server IP as it shall be explicitly set by the user
 			IP:             "",
 			ServiceName:    "xray.service",
-			ConfigFileName: "server-config.json",
+			ConfigFileName: "config.json",
 		},
 		Client: XrayClient{
 			ServerProtocol: "shadowsocks",
