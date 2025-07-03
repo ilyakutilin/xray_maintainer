@@ -215,7 +215,7 @@ func (app *Application) isWarpOK(ctx context.Context, xray Xray) (bool, error) {
 
 	if err := waitForXrayReady(ctx, ready, xray.Client.Port); err != nil {
 		terminateProcess(cmd)
-		return false, err
+		return false, fmt.Errorf("xray verification client failed to start: %w", err)
 	}
 
 	app.logger.Info.Println("xray started successfully. Requesting a detailed " +
@@ -225,7 +225,7 @@ func (app *Application) isWarpOK(ctx context.Context, xray Xray) (bool, error) {
 
 	if err != nil {
 		terminateProcess(cmd)
-		return false, fmt.Errorf("failed to fetch the warp status JSON from the ip checker API: %w", err)
+		return false, nil
 	}
 
 	app.logger.Info.Println("Response received, shutting down the xray verification " +
@@ -359,6 +359,9 @@ func (app *Application) updateWarp(ctx context.Context, xray Xray) error {
 		app.logger.Info.Println("Xray service is operational with the updated config.")
 		app.logger.Info.Println("This was a triumph.")
 		app.logger.Info.Println("I'm making a note here: 'HUGE SUCCESS'")
+	} else {
+		_ = os.Remove(srvBackupFile)
+		app.logger.Info.Printf("The app is in debug mode, so the %s will not be restarted.", app.xrayServiceName)
 	}
 
 	return nil
