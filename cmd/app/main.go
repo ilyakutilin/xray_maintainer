@@ -19,6 +19,11 @@ type Application struct {
 	warnings        []string
 }
 
+func (app *Application) note(txt string) {
+	app.logger.Info.Println(txt)
+	app.warnings = append(app.notes, txt)
+}
+
 func (app *Application) warn(txt string) {
 	app.logger.Warning.Println(txt)
 	app.warnings = append(app.warnings, txt)

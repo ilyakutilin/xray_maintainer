@@ -306,7 +306,7 @@ func (app *Application) updateWarp(ctx context.Context, xray Xray) error {
 		return nil
 	}
 
-	app.logger.Error.Println("Warp is not active, so its update is required.")
+	app.logger.Warning.Println("Warp is not active, so its update is required.")
 
 	app.logger.Info.Println("Launching Cloudflare credential generator to capture " +
 		"its output")
@@ -356,9 +356,9 @@ func (app *Application) updateWarp(ctx context.Context, xray Xray) error {
 					"is required: %w", err)
 			}
 		}
-		app.logger.Info.Println("Xray service is operational with the updated config.")
-		app.logger.Info.Println("This was a triumph.")
-		app.logger.Info.Println("I'm making a note here: 'HUGE SUCCESS'")
+		_ = os.Remove(srvBackupFile)
+		app.note(fmt.Sprintf("Warp config was corrput. It was updated and now"+
+			"the %s is operational with the updated server config.", app.xrayServiceName))
 	} else {
 		_ = os.Remove(srvBackupFile)
 		app.logger.Info.Printf("The app is in debug mode, so the %s will not be restarted.", app.xrayServiceName)
