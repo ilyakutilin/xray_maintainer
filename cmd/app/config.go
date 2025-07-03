@@ -181,11 +181,15 @@ func loadConfig() (*Config, error) {
 	var validSenders []messages.Sender
 
 	for _, sender := range rawSenders {
-		if err := sender.Validate(); err != nil {
-			return nil, fmt.Errorf("the sender failed validation and will not be "+
-				"included in the senders list: %w", err)
+		// TODO: Currently if the validation of the sender fails, it fails silently.
+		// This is because the config is loaded before the logging (since the logging
+		// depends on the config). But the failure must be registered somehow somewhere.
+		if err := sender.Validate(); err == nil {
+			validSenders = append(validSenders, sender)
 		}
-		validSenders = append(validSenders, sender)
+	}
+	if validSenders == nil {
+		validSenders = append(validSenders, &cfg.Messages.StreamSender)
 	}
 	cfg.Messages.MainSender = messages.CompositeSender{
 		Senders: validSenders,
