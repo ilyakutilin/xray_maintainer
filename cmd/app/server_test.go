@@ -587,6 +587,10 @@ func TestSrvInbStreamSettings_Validate(t *testing.T) {
 		ShortIds:    []string{""},
 	}
 
+	validWs := SrvInbStreamWsSettings{
+		Path: "/yU7sgKpoE94Qjl85rQBcCvdf",
+	}
+
 	// Setup invalid reality settings to test error propagation
 	invalidReality := SrvInbStreamRealitySettings{
 		Dest:        "invalid.example.com:443",
@@ -606,7 +610,7 @@ func TestSrvInbStreamSettings_Validate(t *testing.T) {
 			settings: SrvInbStreamSettings{
 				Network:         "tcp",
 				Security:        "reality",
-				RealitySettings: validReality,
+				RealitySettings: &validReality,
 			},
 			wantErr: false,
 		},
@@ -615,7 +619,24 @@ func TestSrvInbStreamSettings_Validate(t *testing.T) {
 			settings: SrvInbStreamSettings{
 				Network:         "raw",
 				Security:        "reality",
-				RealitySettings: validReality,
+				RealitySettings: &validReality,
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid ws",
+			settings: SrvInbStreamSettings{
+				Network:    "ws",
+				WsSettings: &validWs,
+			},
+			wantErr: false,
+		},
+		{
+			name: "empty security",
+			settings: SrvInbStreamSettings{
+				Network:    "ws",
+				Security:   "",
+				WsSettings: &validWs,
 			},
 			wantErr: false,
 		},
@@ -626,7 +647,7 @@ func TestSrvInbStreamSettings_Validate(t *testing.T) {
 			settings: SrvInbStreamSettings{
 				Network:         "",
 				Security:        "reality",
-				RealitySettings: validReality,
+				RealitySettings: &validReality,
 			},
 			wantErr:     true,
 			errContains: "network cannot be empty",
@@ -636,7 +657,7 @@ func TestSrvInbStreamSettings_Validate(t *testing.T) {
 			settings: SrvInbStreamSettings{
 				Network:         "udp",
 				Security:        "reality",
-				RealitySettings: validReality,
+				RealitySettings: &validReality,
 			},
 			wantErr:     true,
 			errContains: "network is 'udp' while only 'raw' or 'tcp'",
@@ -644,21 +665,11 @@ func TestSrvInbStreamSettings_Validate(t *testing.T) {
 
 		// Security validation tests
 		{
-			name: "empty security",
-			settings: SrvInbStreamSettings{
-				Network:         "tcp",
-				Security:        "",
-				RealitySettings: validReality,
-			},
-			wantErr:     true,
-			errContains: "security cannot be empty",
-		},
-		{
 			name: "invalid security",
 			settings: SrvInbStreamSettings{
 				Network:         "tcp",
 				Security:        "tls",
-				RealitySettings: validReality,
+				RealitySettings: &validReality,
 			},
 			wantErr:     true,
 			errContains: "only 'reality' is supported",
@@ -670,7 +681,7 @@ func TestSrvInbStreamSettings_Validate(t *testing.T) {
 			settings: SrvInbStreamSettings{
 				Network:         "tcp",
 				Security:        "reality",
-				RealitySettings: invalidReality,
+				RealitySettings: &invalidReality,
 			},
 			wantErr: true,
 		},
@@ -681,10 +692,10 @@ func TestSrvInbStreamSettings_Validate(t *testing.T) {
 			settings: SrvInbStreamSettings{
 				Network:         "wrong",
 				Security:        "reality",
-				RealitySettings: invalidReality,
+				RealitySettings: &invalidReality,
 			},
 			wantErr:     true,
-			errContains: "only 'raw' or 'tcp' (which are interchangeable) are supported\nserverName '' does not match the domain",
+			errContains: "only 'raw' or 'tcp' (which are interchangeable) or 'ws' are supported\nserverName '' does not match the domain",
 		},
 	}
 
@@ -714,7 +725,7 @@ func TestSrvInbound_Validate(t *testing.T) {
 		Decryption: "none",
 	}
 	validStreamSettings := &SrvInbStreamSettings{
-		RealitySettings: SrvInbStreamRealitySettings{
+		RealitySettings: &SrvInbStreamRealitySettings{
 			Dest:        "example.com:443",
 			ServerNames: []string{"example.com"},
 			PrivateKey:  "valid-key",
@@ -807,23 +818,10 @@ func TestSrvInbound_Validate(t *testing.T) {
 				Settings: validSettings,
 			},
 			wantErr:     true,
-			errContains: "inbound.port: vless protocol only supports port 443",
+			errContains: "inbound.port: vless protocol only supports ports 80 and 443",
 		},
 
 		// Listen IP validation
-		{
-			name: "vless with internal IP",
-			inbound: SrvInbound{
-				Protocol: "vless",
-				Tag:      "vless-in",
-				Port:     443,
-				Listen:   "192.168.1.1",
-				Sniffing: validSniffing,
-				Settings: validSettings,
-			},
-			wantErr:     true,
-			errContains: "inbound.listen shall be an external IPv4 address",
-		},
 		{
 			name: "vless with empty listen",
 			inbound: SrvInbound{

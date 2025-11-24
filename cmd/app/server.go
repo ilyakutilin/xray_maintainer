@@ -284,22 +284,43 @@ func (s *SrvInbStreamRealitySettings) Validate() error {
 	return nil
 }
 
+type SrvInbStreamWsSettings struct {
+	Path string `json:"path"`
+}
+
+func (s *SrvInbStreamWsSettings) Validate() error {
+	var errs utils.Errors
+
+	if !strings.HasPrefix(s.Path, "/") {
+		errs.Append(fmt.Errorf("inbound.streamSettings.wsSettings.path is '%s' "+
+			"which is not a valid path: path should start with '/'", s.Path))
+	}
+
+	if len(errs) > 0 {
+		return errs
+	}
+
+	return nil
+}
+
 type SrvInbStreamSettings struct {
-	Network         string                      `json:"network"`
-	Security        string                      `json:"security"`
-	RealitySettings SrvInbStreamRealitySettings `json:"realitySettings"`
+	Network         string                       `json:"network"`
+	Security        string                       `json:"security,omitempty"`
+	RealitySettings *SrvInbStreamRealitySettings `json:"realitySettings,omitempty"`
+	WsSettings      *SrvInbStreamWsSettings      `json:"wsSettings,omitempty"`
 }
 
 func (s *SrvInbStreamSettings) Validate() error {
 	var errs utils.Errors
 
 	switch s.Network {
-	case "raw", "tcp":
+	case "raw", "tcp", "ws":
 	case "":
 		errs.Append(errors.New("inbound.streamSettings.network cannot be empty"))
 	default:
 		errs.Append(fmt.Errorf("inbound.streamSettings.network is '%s' while only "+
-			"'raw' or 'tcp' (which are interchangeable) are supported", s.Network))
+			"'raw' or 'tcp' (which are interchangeable) or 'ws' are supported",
+			s.Network))
 	}
 
 	switch s.Security {
@@ -309,7 +330,6 @@ func (s *SrvInbStreamSettings) Validate() error {
 			errs.Append(err)
 		}
 	case "":
-		errs.Append(errors.New("inbound.streamSettings.security cannot be empty"))
 	default:
 		errs.Append(errors.New("inbound.streamSettings.security: only 'reality' " +
 			"is supported"))
@@ -348,12 +368,13 @@ func (i *SrvInbound) Validate() error {
 		errs.Append(errors.New("inbound.tag cannot be empty"))
 	}
 
-	if i.Protocol == "vless" && i.Port != 443 {
-		errs.Append(errors.New("inbound.port: vless protocol only supports port 443"))
+	if i.Protocol == "vless" && !utils.IsValidVlessPort(i.Port) {
+		errs.Append(errors.New("inbound.port: vless protocol only supports ports " +
+			"80 and 443"))
 	}
 
-	if i.Protocol == "vless" && !utils.IsExternalIPv4(i.Listen) {
-		errs.Append(errors.New("inbound.listen shall be an external IPv4 address for the " +
+	if i.Protocol == "vless" && !utils.IsValidIP(i.Listen) {
+		errs.Append(errors.New("inbound.listen shall be an external IPv4 address for " +
 			"vless protocol"))
 	}
 
