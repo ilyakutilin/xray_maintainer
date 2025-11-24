@@ -294,74 +294,99 @@ func (app *Application) updateWarp(ctx context.Context, xray Xray) error {
 	}
 	app.logger.Info.Println("Client config has successfully been generated " +
 		"and saved to a file in the main working directory.")
+
 	app.logger.Info.Println("Starting to check if the warp is active and responsive " +
 		"using the temporary verification client...")
-	warpOK, err := app.isWarpOK(ctx, xray)
-	if err != nil {
-		return fmt.Errorf("failed to obtain the warp status: %w", err)
-	}
 
-	if warpOK {
-		app.logger.Info.Println("Warp is active, so its update is not required.")
-		return nil
-	}
+	tryCount := 0
+	maxTries := 5
 
-	app.logger.Warning.Println("Warp is not active, so its update is required.")
+	for tryCount < maxTries {
+		warpOK, err := app.isWarpOK(ctx, xray)
+		if err != nil {
+			return fmt.Errorf("failed to obtain the warp status: %w", err)
+		}
 
-	app.logger.Info.Println("Launching Cloudflare credential generator to capture " +
-		"its output")
-	cfCredOutput, err := app.getCFCreds(ctx, xray.CFCredFilePath)
-	if err != nil {
-		return fmt.Errorf("error while launching the Cloudflare credentials "+
-			"generator: %w", err)
-	}
+		if warpOK {
+			app.logger.Info.Println("Warp is active and fine.")
+			return nil
+		}
 
-	app.logger.Info.Println("Obtained the Cloudflare credentials, parsing...")
-	cfCreds, err := parseCFCreds(cfCredOutput)
-	if err != nil {
-		return fmt.Errorf("error while parsing the generated Cloudflare "+
-			"credentials: %w", err)
-	}
+		app.logger.Warning.Printf("Warp is not active, so its update is required. "+
+			"Attempt to update warp config # %d", tryCount+1)
 
-	app.logger.Info.Println("Successfully parsed the credentials. Updating the xray " +
-		"server config with new Warp settings...")
-	if err := updateServerWarpConfig(&xrayServerConfig, &cfCreds); err != nil {
-		return fmt.Errorf("error updating the xray server config: %w", err)
-	}
+		app.logger.Info.Println("Launching Cloudflare credential generator to capture " +
+			"its output")
+		cfCredOutput, err := app.getCFCreds(ctx, xray.CFCredFilePath)
+		if err != nil {
+			return fmt.Errorf("error while launching the Cloudflare credentials "+
+				"generator: %w", err)
+		}
 
-	app.logger.Info.Println("Writing the new xray server config to file...")
-	srvBackupFile, err := utils.BackupFile(xray.Server.ConfigFilePath)
-	if err != nil {
-		return fmt.Errorf("failed to back up the xray server config file: %w", err)
-	}
-	if err := utils.WriteStructToJSONFile(&xrayServerConfig, xray.Server.ConfigFilePath); err != nil {
-		_ = os.Remove(srvBackupFile)
-		return fmt.Errorf("error writing the new xray server config to file: %w", err)
-	}
+		app.logger.Info.Println("Obtained the Cloudflare credentials, parsing...")
+		cfCreds, err := parseCFCreds(cfCredOutput)
+		if err != nil {
+			if tryCount == maxTries-1 {
+				return fmt.Errorf("error while parsing the generated Cloudflare "+
+					"credentials: %w", err)
+			}
+			tryCount++
+			continue
+		}
 
-	if !app.debug {
-		app.logger.Info.Println("Restarting the xray server service...")
-		if err := utils.CheckOperability(ctx, app.xrayServiceName, nil); err != nil {
-			app.logger.Info.Println("Xray server service is not operable after " +
-				"restart, so reverting the config file to its previous state and " +
-				"checking the xray server service operability again...")
-			if err := utils.RestoreFile(srvBackupFile, xray.Server.ConfigFilePath); err != nil {
-				return fmt.Errorf("error restoring the backup of the xray server "+
-					"config file to its original path: %w", err)
+		app.logger.Info.Println("Successfully parsed the credentials. Updating the xray " +
+			"server config with new Warp settings...")
+		if err := updateServerWarpConfig(&xrayServerConfig, &cfCreds); err != nil {
+			return fmt.Errorf("error updating the xray server config: %w", err)
+		}
+
+		app.logger.Info.Println("Writing the new xray server config to file...")
+		srvBackupFile, err := utils.BackupFile(xray.Server.ConfigFilePath)
+		if err != nil {
+			return fmt.Errorf("failed to back up the xray server config file: %w", err)
+		}
+		if err := utils.WriteStructToJSONFile(&xrayServerConfig, xray.Server.ConfigFilePath); err != nil {
+			_ = os.Remove(srvBackupFile)
+			return fmt.Errorf("error writing the new xray server config to file: %w", err)
+		}
+
+		if !app.debug {
+			app.logger.Info.Println("Restarting the xray server service...")
+			if err := utils.CheckOperability(ctx, app.xrayServiceName, nil); err != nil {
+				if tryCount < maxTries-1 {
+					app.logger.Info.Printf("%s is not operable after the update "+
+						"attempt # %d. Trying to update warp again...",
+						app.xrayServiceName, tryCount+1)
+					tryCount++
+					continue
+				}
+				app.logger.Info.Printf("%s is not operable after the last update "+
+					"attempt, so reverting the config file to its previous state and "+
+					"checking the xray server service operability again...", app.xrayServiceName)
+				if err := utils.RestoreFile(srvBackupFile, xray.Server.ConfigFilePath); err != nil {
+					return fmt.Errorf("error restoring the backup of the xray server "+
+						"config file to its original path: %w", err)
+				}
+				_ = os.Remove(srvBackupFile)
+				if err := utils.CheckOperability(ctx, app.xrayServiceName, nil); err != nil {
+					return fmt.Errorf("even after restoring the original xray server "+
+						"config after the failed update attempts the service is still "+
+						"inoperable. Further investigation is required: %w", err)
+				}
+				app.warn(fmt.Sprintf("Attempt to update the corrupt warp config "+
+					"failed. %s is operational, but without warp.",
+					app.xrayServiceName))
 			}
 			_ = os.Remove(srvBackupFile)
-			if err := utils.CheckOperability(ctx, app.xrayServiceName, nil); err != nil {
-				return fmt.Errorf("even after restoring the original xray server "+
-					"config the service is still inoperable. Further investigation "+
-					"is required: %w", err)
-			}
+			app.note(fmt.Sprintf("Warp config was corrput. It was updated and now"+
+				"the %s is operational with the updated server config.", app.xrayServiceName))
+			return nil
+
+		} else {
+			_ = os.Remove(srvBackupFile)
+			app.logger.Info.Printf("The app is in debug mode, so the %s will not be restarted.", app.xrayServiceName)
+			break
 		}
-		_ = os.Remove(srvBackupFile)
-		app.note(fmt.Sprintf("Warp config was corrput. It was updated and now"+
-			"the %s is operational with the updated server config.", app.xrayServiceName))
-	} else {
-		_ = os.Remove(srvBackupFile)
-		app.logger.Info.Printf("The app is in debug mode, so the %s will not be restarted.", app.xrayServiceName)
 	}
 
 	return nil
