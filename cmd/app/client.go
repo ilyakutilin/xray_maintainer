@@ -106,7 +106,9 @@ func getClientConfig(xrayClient *XrayClient, xrayServerConfig *ServerConfig) *Cl
 	var client SrvInbSettingsClient
 	if server_clients != nil && len(*server_clients) > 0 {
 		client = (*server_clients)[0]
-		// TODO: There should be some error handling here. What is there is no client?
+	}
+	if client.ID == "" {
+		return nil
 	}
 
 	clientOutbound := ClientOutbound{

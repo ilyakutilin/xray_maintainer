@@ -220,6 +220,11 @@ func (app *Application) updateWarp(ctx context.Context, xray Xray) error {
 	app.logger.Info.Println("Generating a config for the temporary warp verification " +
 		"xray client...")
 	clientConfig := getClientConfig(&xray.Client, &xrayServerConfig)
+	if clientConfig == nil {
+		return errors.New("failed to build the client config. This is most likely " +
+			"due to the misconfigured server config which should have " +
+			"inbounds[X].settings.clients[X].id value but apparently doesn't")
+	}
 	if err := utils.WriteStructToJSONFile(clientConfig, xray.Client.ConfigFilePath); err != nil {
 		return fmt.Errorf("error writing client config to %q: %w", xray.Client.ConfigFilePath, err)
 	}
