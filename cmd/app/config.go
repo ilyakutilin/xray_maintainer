@@ -21,10 +21,11 @@ type XrayServer struct {
 }
 
 type XrayClient struct {
-	// Only shadowsocks is supported so the value is not taken from yaml, it is always
+	// Only vless is supported so the value is not taken from yaml, it is always
 	// taken from the defaults
 	ServerProtocol string
 	Port           int    `koanf:"port"`
+	PublicKey      string `koanf:"public_key"`
 	IPCheckerURL   string `koanf:"ip_checker_url"`
 	ConfigFileName string `koanf:"config_filename"`
 	ConfigFilePath string
@@ -71,8 +72,10 @@ var defaults = Config{
 			ConfigFileName: "config.json",
 		},
 		Client: XrayClient{
-			ServerProtocol: "shadowsocks",
+			ServerProtocol: "vless",
 			Port:           10801,
+			// No default for Public Key as it shall be explicitly set by the user
+			PublicKey:      "",
 			IPCheckerURL:   "http://ip-api.com/json/?fields=status,message,isp,org,query",
 			ConfigFileName: "client-config.json",
 		},
@@ -151,6 +154,10 @@ func loadConfig() (*Config, error) {
 
 	if cfg.Xray.Server.IP == "" {
 		return nil, errors.New("xray server IP should be set")
+	}
+
+	if cfg.Xray.Client.PublicKey == "" {
+		return nil, errors.New("client public key should be set")
 	}
 
 	cfg.Workdir, err = utils.ExpandPath(cfg.Workdir)
