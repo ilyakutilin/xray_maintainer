@@ -117,7 +117,7 @@ func getClientConfig(xrayClient *XrayClient, xrayServerConfig *ServerConfig) *Cl
 		Settings: ClientOutboundSettings{
 			VNext: []ClientOutboundSettingsVNext{
 				{
-					Address: "127.0.0.1",
+					Address: inbound.Listen,
 					Port:    443,
 					Users: []ClientOutboundSettingsVNextUser{
 						{

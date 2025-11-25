@@ -117,7 +117,7 @@ func TestGetClientConfig(t *testing.T) {
 			utils.AssertCorrectString(t, "http", cc.Inbounds[0].Protocol)
 			utils.AssertCorrectString(t, "vless", cc.Outbounds[0].Protocol)
 			utils.AssertCorrectString(t, "vless", cc.Outbounds[0].Tag)
-			utils.AssertCorrectString(t, "127.0.0.1", cc.Outbounds[0].Settings.VNext[0].Address)
+			utils.AssertCorrectString(t, "123.123.123.123", cc.Outbounds[0].Settings.VNext[0].Address)
 			utils.AssertCorrectInt(t, 443, cc.Outbounds[0].Settings.VNext[0].Port)
 			utils.AssertCorrectString(t, tt.clientID, cc.Outbounds[0].Settings.VNext[0].Users[0].Id)
 			utils.AssertCorrectString(t, "xtls-rprx-vision", cc.Outbounds[0].Settings.VNext[0].Users[0].Flow)
