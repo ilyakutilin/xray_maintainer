@@ -155,6 +155,7 @@ func (app *Application) isWarpOK(ctx context.Context, xray Xray) (bool, error) {
 	apiResponse, err := utils.GetRequestWithProxy(ctx, xray.Client.IPCheckerURL, &proxy)
 
 	if err != nil {
+		app.logger.Error.Printf("Could not receive reply with proxy. Error: %v", err)
 		terminateProcess(cmd)
 		return false, nil
 	}
@@ -225,11 +226,14 @@ func (app *Application) updateWarp(ctx context.Context, xray Xray) error {
 			"due to the misconfigured server config which should have " +
 			"inbounds[X].settings.clients[X].id value but apparently doesn't")
 	}
-	if err := utils.WriteStructToJSONFile(clientConfig, xray.Client.ConfigFilePath); err != nil {
-		return fmt.Errorf("error writing client config to %q: %w", xray.Client.ConfigFilePath, err)
+	if !app.debug {
+		if err := utils.WriteStructToJSONFile(clientConfig, xray.Client.ConfigFilePath); err != nil {
+			return fmt.Errorf("error writing client config to %q: %w",
+				xray.Client.ConfigFilePath, err)
+		}
+		app.logger.Info.Println("Client config has successfully been generated " +
+			"and saved to a file in the main working directory.")
 	}
-	app.logger.Info.Println("Client config has successfully been generated " +
-		"and saved to a file in the main working directory.")
 
 	app.logger.Info.Println("Starting to check if the warp is active and responsive " +
 		"using the temporary verification client...")
@@ -251,8 +255,8 @@ func (app *Application) updateWarp(ctx context.Context, xray Xray) error {
 		app.logger.Warning.Printf("Warp is not active, so its update is required. "+
 			"Attempt to update warp config # %d", tryCount+1)
 
-		app.logger.Info.Println("Launching Cloudflare credential generator to capture " +
-			"its output")
+		app.logger.Info.Println("Launching Cloudflare credential generator " +
+			"to capture its output")
 		cfCredOutput, err := app.getCFCreds(ctx, xray.CFCredFilePath)
 		if err != nil {
 			return fmt.Errorf("error while launching the Cloudflare credentials "+
@@ -270,23 +274,25 @@ func (app *Application) updateWarp(ctx context.Context, xray Xray) error {
 			continue
 		}
 
-		app.logger.Info.Println("Successfully parsed the credentials. Updating the xray " +
-			"server config with new Warp settings...")
+		app.logger.Info.Println("Successfully parsed the credentials. Updating " +
+			"the xray server config with new Warp settings...")
 		if err := updateServerWarpConfig(&xrayServerConfig, &cfCreds); err != nil {
 			return fmt.Errorf("error updating the xray server config: %w", err)
 		}
 
-		app.logger.Info.Println("Writing the new xray server config to file...")
-		srvBackupFile, err := utils.BackupFile(xray.Server.ConfigFilePath)
-		if err != nil {
-			return fmt.Errorf("failed to back up the xray server config file: %w", err)
-		}
-		if err := utils.WriteStructToJSONFile(&xrayServerConfig, xray.Server.ConfigFilePath); err != nil {
-			_ = os.Remove(srvBackupFile)
-			return fmt.Errorf("error writing the new xray server config to file: %w", err)
-		}
-
 		if !app.debug {
+			app.logger.Info.Println("Writing the new xray server config to file...")
+			srvBackupFile, err := utils.BackupFile(xray.Server.ConfigFilePath)
+			if err != nil {
+				return fmt.Errorf("failed to back up the xray server config file: %w",
+					err)
+			}
+			if err := utils.WriteStructToJSONFile(&xrayServerConfig, xray.Server.ConfigFilePath); err != nil {
+				_ = os.Remove(srvBackupFile)
+				return fmt.Errorf("error writing the new xray server config to file: "+
+					"%w", err)
+			}
+
 			app.logger.Info.Println("Restarting the xray server service...")
 			if err := utils.CheckOperability(ctx, app.xrayServiceName, nil); err != nil {
 				if tryCount < maxTries-1 {
@@ -298,7 +304,8 @@ func (app *Application) updateWarp(ctx context.Context, xray Xray) error {
 				}
 				app.logger.Info.Printf("%s is not operable after the last update "+
 					"attempt, so reverting the config file to its previous state and "+
-					"checking the xray server service operability again...", app.xrayServiceName)
+					"checking the xray server service operability again...",
+					app.xrayServiceName)
 				if err := utils.RestoreFile(srvBackupFile, xray.Server.ConfigFilePath); err != nil {
 					return fmt.Errorf("error restoring the backup of the xray server "+
 						"config file to its original path: %w", err)
@@ -315,12 +322,14 @@ func (app *Application) updateWarp(ctx context.Context, xray Xray) error {
 			}
 			_ = os.Remove(srvBackupFile)
 			app.note(fmt.Sprintf("Warp config was corrput. It was updated and now"+
-				"the %s is operational with the updated server config.", app.xrayServiceName))
+				"the %s is operational with the updated server config.",
+				app.xrayServiceName))
 			return nil
 
 		} else {
-			_ = os.Remove(srvBackupFile)
-			app.logger.Info.Printf("The app is in debug mode, so the %s will not be restarted.", app.xrayServiceName)
+			app.logger.Info.Printf("The app is in debug mode, so the %s will not be "+
+				"restarted and no file manipulations will be done.",
+				app.xrayServiceName)
 			break
 		}
 	}
