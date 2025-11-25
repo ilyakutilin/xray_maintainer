@@ -88,9 +88,9 @@ func getClientConfig(xrayClient *XrayClient, xrayServerConfig *ServerConfig) *Cl
 	// the warp verification client will use
 	// !!! For the moment this works only with vless !!!
 	var inbound *SrvInbound
-	for _, inb := range xrayServerConfig.Inbounds {
-		if inb.Protocol == xrayClient.ServerProtocol {
-			inbound = &inb
+	for i := range xrayServerConfig.Inbounds {
+		if xrayServerConfig.Inbounds[i].Protocol == xrayClient.ServerProtocol {
+			inbound = &xrayServerConfig.Inbounds[i] // <-- pointer to actual element
 			break
 		}
 	}
