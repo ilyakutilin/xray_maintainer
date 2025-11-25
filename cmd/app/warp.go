@@ -97,75 +97,6 @@ func parseCFCreds(output string) (CFCreds, error) {
 	return result, nil
 }
 
-func getClientConfig(xrayClient *XrayClient, xrayServer *XrayServer, xrayServerConfig *ServerConfig) *ClientConfig {
-	var clientConfig ClientConfig
-
-	clientConfig.Log = Log{Loglevel: "warning"}
-
-	clientInbound := ClientInbound{
-		Port:     xrayClient.Port,
-		Protocol: "http",
-	}
-	clientConfig.Inbounds = append(clientConfig.Inbounds, clientInbound)
-
-	var cs ClientOutboundSettingsServer
-
-	// Loop through the server inbounds to find the one with the protocol that
-	// the warp verification client will use
-	// !!! For the moment this works only with shadowsocks !!!
-	var found bool
-	var routingRuleNetwork string
-	for _, inbound := range xrayServerConfig.Inbounds {
-		if inbound.Protocol == xrayClient.ServerProtocol {
-			found = true
-			cs.Address = xrayServer.IP
-			cs.Port = inbound.Port
-			cs.Method = inbound.Settings.Method
-			cs.Password = inbound.Settings.Password
-			routingRuleNetwork = inbound.Settings.Network
-			break
-		}
-	}
-
-	if !found {
-		panic(fmt.Sprintf("protocol %s has not been found in the xray server config "+
-			"inbounds, which means that the server config was not properly validated "+
-			"after parsing. Check your code so that the protocol required for the "+
-			"client operation is supported.", xrayClient.ServerProtocol))
-	}
-
-	if cs.Method == "" || cs.Password == "" {
-		panic(fmt.Sprintf("protocol %s is present in the xray server config inbounds, "+
-			"but it still did not provide the required credentials for the client "+
-			"config, which means that the server config was not properly validated "+
-			"after parsing. Check your code so that the protocol required for the "+
-			"client operation is supported.", xrayClient.ServerProtocol))
-	}
-
-	clientOutbound := ClientOutbound{
-		Protocol: xrayClient.ServerProtocol,
-		Tag:      xrayClient.ServerProtocol,
-		Settings: ClientOutboundSettings{
-			Servers: []ClientOutboundSettingsServer{cs},
-		},
-	}
-	clientConfig.Outbounds = append(clientConfig.Outbounds, clientOutbound)
-
-	clientRoutingRule := ClientRoutingRule{
-		Type:        "field",
-		OutboundTag: xrayClient.ServerProtocol,
-		Network:     routingRuleNetwork,
-	}
-
-	clientRouting := ClientRouting{
-		Rules:          []ClientRoutingRule{clientRoutingRule},
-		DomainStrategy: "IPIfNonMatch",
-	}
-	clientConfig.Routing = clientRouting
-
-	return &clientConfig
-}
-
 func checkIPCheckerResponse(ipCheckerResponseJSON []byte, xrayServerIP string) error {
 	type IPCheckerResponse struct {
 		Status  string `json:"status"`
@@ -288,7 +219,12 @@ func (app *Application) updateWarp(ctx context.Context, xray Xray) error {
 	// Get the client config and verify that warp is active
 	app.logger.Info.Println("Generating a config for the temporary warp verification " +
 		"xray client...")
-	clientConfig := getClientConfig(&xray.Client, &xray.Server, &xrayServerConfig)
+	clientConfig := getClientConfig(&xray.Client, &xrayServerConfig)
+	if clientConfig == nil {
+		return errors.New("failed to build the client config. This is most likely " +
+			"due to the misconfigured server config which should have " +
+			"inbounds[X].settings.clients[X].id value but apparently doesn't")
+	}
 	if err := utils.WriteStructToJSONFile(clientConfig, xray.Client.ConfigFilePath); err != nil {
 		return fmt.Errorf("error writing client config to %q: %w", xray.Client.ConfigFilePath, err)
 	}

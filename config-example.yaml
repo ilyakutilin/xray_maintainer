@@ -9,6 +9,7 @@ xray:
     config_filename: server-config.json
   client:
     port: 10801
+    public_key: some-public-key
     ip_checker_url: 'http://ip-api.com/json/?fields=status,message,isp,org,query'
     config_filename: client-config.json
 

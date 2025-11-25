@@ -623,16 +623,16 @@ func (c *ServerConfig) Validate() error {
 		errs.Append(errors.New("xray server config must have at least one inbound"))
 	}
 
-	shadowsocksExists := false
+	vlessExists := false
 	for _, inbound := range c.Inbounds {
-		if inbound.Protocol == "shadowsocks" {
-			shadowsocksExists = true
+		if inbound.Protocol == "vless" {
+			vlessExists = true
 			break
 		}
 	}
-	if !shadowsocksExists {
+	if !vlessExists {
 		errs.Append(errors.New("xray server config must have at least one inbound " +
-			"with shadowsocks protocol since it will be required for the warp " +
+			"with vless protocol since it will be required for the warp " +
 			"verification client"))
 	}
 
