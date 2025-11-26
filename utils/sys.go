@@ -3,7 +3,6 @@ package utils
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -38,7 +37,9 @@ type CommandExecutor func(context.Context, string) (string, error)
 
 var defaultExecutor CommandExecutor = ExecuteCommand
 
-func RestartService(ctx context.Context, serviceName string, executor CommandExecutor) error {
+func RestartService(
+	ctx context.Context, serviceName string, executor CommandExecutor,
+) error {
 	if executor == nil {
 		executor = defaultExecutor
 	}
@@ -47,7 +48,9 @@ func RestartService(ctx context.Context, serviceName string, executor CommandExe
 	return err
 }
 
-func CheckServiceStatus(ctx context.Context, serviceName string, executor CommandExecutor) (bool, error) {
+func CheckServiceStatus(
+	ctx context.Context, serviceName string, executor CommandExecutor,
+) (bool, error) {
 	if executor == nil {
 		executor = defaultExecutor
 	}
@@ -66,7 +69,9 @@ func CheckServiceStatus(ctx context.Context, serviceName string, executor Comman
 	return false, nil
 }
 
-func CheckOperability(ctx context.Context, serviceName string, executor CommandExecutor) error {
+func CheckOperability(
+	ctx context.Context, serviceName string, executor CommandExecutor,
+) error {
 	err := RestartService(ctx, serviceName, executor)
 	if err != nil {
 		return err
@@ -102,6 +107,7 @@ func checkCommandInSudoers(ctx context.Context, cmdStr string) error {
 	for _, line := range lines {
 		if strings.Contains(line, "NOPASSWD") && lineEndsWithCommand(line, cmdStr) {
 			found = true
+			break
 		}
 	}
 	if !found {
@@ -117,28 +123,55 @@ func checkCommandInSudoers(ctx context.Context, cmdStr string) error {
 // to the given path
 func checkPathPermissions(path string) error {
 	// Check if path exists
-	if _, err := os.Stat(path); err != nil {
-		if os.IsNotExist(err) {
-			return errors.New("path does not exist: " + path)
-		}
-		return err
-	}
-
-	// Check read permission by attempting to read
-	if _, err := os.ReadDir(path); err != nil {
-		// If directory read fails, try file read
-		if _, err := os.ReadFile(path); err != nil {
-			return errors.New("no read permission: " + path)
-		}
-	}
-
-	// Check write permission by attempting to write a temporary file
-	tempFile, err := os.CreateTemp(path, "perm_test_")
+	fileInfo, err := os.Stat(path)
 	if err != nil {
-		return errors.New("no write permission: " + path)
+		if os.IsNotExist(err) {
+			return fmt.Errorf("path does not exist: %s", path)
+		}
+		return fmt.Errorf("cannot access path: %w", err)
 	}
-	tempFile.Close()
-	os.Remove(tempFile.Name())
+
+	// Check read permission based on file type
+	if fileInfo.IsDir() {
+		// For directories, check if we can read contents
+		if _, err := os.ReadDir(path); err != nil {
+			return fmt.Errorf("no read permission for directory: %s", path)
+		}
+	} else {
+		// For files, check if we can read the file
+		if _, err := os.ReadFile(path); err != nil {
+			return fmt.Errorf("no read permission for file: %s", path)
+		}
+	}
+
+	// Check write permission by attempting to write and remove a temporary file/directory
+	if fileInfo.IsDir() {
+		tempFile, err := os.CreateTemp(path, "perm_test_")
+		if err != nil {
+			return fmt.Errorf("no write permission for directory: %s", path)
+		}
+
+		// Test actual writing
+		testContent := []byte("test")
+		if _, err := tempFile.Write(testContent); err != nil {
+			tempFile.Close()
+			os.Remove(tempFile.Name())
+			return fmt.Errorf("no write permission for directory: %s", path)
+		}
+		tempFile.Close()
+
+		// Clean up
+		if err := os.Remove(tempFile.Name()); err != nil {
+			return fmt.Errorf("cannot remove test file: %w", err)
+		}
+	} else {
+		// For files, check if we can write to it
+		file, err := os.OpenFile(path, os.O_WRONLY, 0)
+		if err != nil {
+			return fmt.Errorf("no write permission for file: %s", path)
+		}
+		file.Close()
+	}
 
 	return nil
 }
