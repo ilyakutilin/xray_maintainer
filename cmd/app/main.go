@@ -55,8 +55,10 @@ func main() {
 		}
 	}()
 
+	ctx := context.Background()
+
 	if !app.debug {
-		if err := utils.CheckSudo(); err != nil {
+		if err := utils.CheckPermissions(ctx, app.xrayServiceName, app.workdir); err != nil {
 			app.logger.Error.Fatal(err)
 		}
 	}
@@ -72,8 +74,6 @@ func main() {
 		)
 		app.logger.Error.Fatalf("Error creating workdir: %v", err)
 	}
-
-	ctx := context.Background()
 
 	if err := app.updateMultipleFiles(ctx, cfg.Repos, NewFile); err != nil {
 		app.sendMsg(

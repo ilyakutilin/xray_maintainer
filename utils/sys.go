@@ -11,15 +11,6 @@ import (
 	"time"
 )
 
-// Checks if the app has sudo privileges
-// TODO: CheckSudo() is currently used only in the tests - check implementation!
-func CheckSudo() error {
-	if os.Geteuid() != 0 {
-		return errors.New("this application requires sudo/root privileges")
-	}
-	return nil
-}
-
 // Runs a shell command and returns its output or an error.
 func ExecuteCommand(ctx context.Context, cmdStr string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -154,10 +145,12 @@ func checkPathPermissions(path string) error {
 
 // CheckPermissions checks the permissions to read / write to the workdir
 // and execute the service restart command by the current user
-func CheckPermissions(ctx context.Context, restartCmd string, workDir string) error {
+func CheckPermissions(ctx context.Context, serviceName string, workDir string) error {
 	if err := checkPathPermissions(workDir); err != nil {
 		return fmt.Errorf("permission check failed: %w", err)
 	}
+
+	restartCmd := fmt.Sprintf("sudo systemctl restart %s", serviceName)
 
 	if err := checkCommandInSudoers(ctx, restartCmd); err != nil {
 		return fmt.Errorf("permission check failed: %w", err)
