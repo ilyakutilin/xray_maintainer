@@ -88,8 +88,10 @@ func CheckOperability(
 
 // checkCommandInSudoers checks if the command is added to the sudoers file
 // and its execution by the current user is allowed without a password
-func checkCommandInSudoers(ctx context.Context, cmdStr string) error {
-	output, err := ExecuteCommand(ctx, "sudo -l")
+func checkCommandInSudoers(
+	ctx context.Context, cmdStr string, executor CommandExecutor,
+) error {
+	output, err := executor(ctx, "sudo -l")
 	if err != nil {
 		return err
 	}
@@ -97,15 +99,14 @@ func checkCommandInSudoers(ctx context.Context, cmdStr string) error {
 	lines := strings.Split(string(output), "\n")
 	var found bool
 
-	lineEndsWithCommand := func(line string, targetCommand string) bool {
-		trimmedLine := strings.TrimSpace(line)
-		trimmedTarget := strings.TrimSpace(targetCommand)
-
-		return strings.HasSuffix(trimmedLine, trimmedTarget)
-	}
+	trimmedTarget := strings.ReplaceAll(
+		strings.TrimSpace(cmdStr), "sudo ", "",
+	)
 
 	for _, line := range lines {
-		if strings.Contains(line, "NOPASSWD") && lineEndsWithCommand(line, cmdStr) {
+		trimmedLine := strings.TrimSpace(line)
+		if strings.Contains(line, "NOPASSWD") &&
+			strings.HasSuffix(trimmedLine, trimmedTarget) {
 			found = true
 			break
 		}
@@ -113,16 +114,16 @@ func checkCommandInSudoers(ctx context.Context, cmdStr string) error {
 	if !found {
 		return fmt.Errorf("please add the '%s' command to sudoers file: run "+
 			"'sudo visudo' and add the line 'username ALL=(root) NOPASSWD: %s' "+
-			"where username is your user name", cmdStr, cmdStr)
+			"where username is your user name", trimmedTarget, trimmedTarget)
 	}
 
 	return nil
 }
 
-// checkPathPermissions checks if the current user has read and write permissions
+// checkDirPermissions checks if the current user has read and write permissions
 // to the given path
-func checkPathPermissions(path string) error {
-	// Check if path exists
+func checkDirPermissions(path string) error {
+	// Check if path exists and is a directory
 	fileInfo, err := os.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -131,46 +132,36 @@ func checkPathPermissions(path string) error {
 		return fmt.Errorf("cannot access path: %w", err)
 	}
 
-	// Check read permission based on file type
-	if fileInfo.IsDir() {
-		// For directories, check if we can read contents
-		if _, err := os.ReadDir(path); err != nil {
-			return fmt.Errorf("no read permission for directory: %s", path)
-		}
-	} else {
-		// For files, check if we can read the file
-		if _, err := os.ReadFile(path); err != nil {
-			return fmt.Errorf("no read permission for file: %s", path)
-		}
+	// Verify it's actually a directory
+	if !fileInfo.IsDir() {
+		return fmt.Errorf("path is not a directory: %s", path)
 	}
 
-	// Check write permission by attempting to write and remove a temporary file/directory
-	if fileInfo.IsDir() {
-		tempFile, err := os.CreateTemp(path, "perm_test_")
-		if err != nil {
-			return fmt.Errorf("no write permission for directory: %s", path)
-		}
+	// Check read permission by attempting to read directory contents
+	if _, err := os.ReadDir(path); err != nil {
+		return fmt.Errorf("no read permission for directory: %s", path)
+	}
 
-		// Test actual writing
-		testContent := []byte("test")
-		if _, err := tempFile.Write(testContent); err != nil {
-			tempFile.Close()
-			os.Remove(tempFile.Name())
-			return fmt.Errorf("no write permission for directory: %s", path)
-		}
-		tempFile.Close()
+	// Check write permission by creating, writing to, and removing a temporary file
+	tempFile, err := os.CreateTemp(path, "perm_test_")
+	if err != nil {
+		return fmt.Errorf("no write permission for directory: %s", path)
+	}
+	defer os.Remove(tempFile.Name()) // Clean up in case of errors
 
-		// Clean up
-		if err := os.Remove(tempFile.Name()); err != nil {
-			return fmt.Errorf("cannot remove test file: %w", err)
-		}
-	} else {
-		// For files, check if we can write to it
-		file, err := os.OpenFile(path, os.O_WRONLY, 0)
-		if err != nil {
-			return fmt.Errorf("no write permission for file: %s", path)
-		}
-		file.Close()
+	// Test actual writing capability
+	testContent := []byte("test")
+	if _, err := tempFile.Write(testContent); err != nil {
+		return fmt.Errorf("no write permission for directory: %s", path)
+	}
+
+	if err := tempFile.Close(); err != nil {
+		return fmt.Errorf("cannot close test file: %w", err)
+	}
+
+	// Clean up the test file
+	if err := os.Remove(tempFile.Name()); err != nil {
+		return fmt.Errorf("cannot remove test file: %w", err)
 	}
 
 	return nil
@@ -178,14 +169,20 @@ func checkPathPermissions(path string) error {
 
 // CheckPermissions checks the permissions to read / write to the workdir
 // and execute the service restart command by the current user
-func CheckPermissions(ctx context.Context, serviceName string, workDir string) error {
-	if err := checkPathPermissions(workDir); err != nil {
+func CheckPermissions(
+	ctx context.Context, serviceName string, workDir string, executor CommandExecutor,
+) error {
+	if executor == nil {
+		executor = defaultExecutor
+	}
+
+	if err := checkDirPermissions(workDir); err != nil {
 		return fmt.Errorf("permission check failed: %w", err)
 	}
 
 	restartCmd := fmt.Sprintf("sudo systemctl restart %s", serviceName)
 
-	if err := checkCommandInSudoers(ctx, restartCmd); err != nil {
+	if err := checkCommandInSudoers(ctx, restartCmd, executor); err != nil {
 		return fmt.Errorf("permission check failed: %w", err)
 	}
 
