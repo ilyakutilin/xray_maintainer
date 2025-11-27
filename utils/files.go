@@ -17,31 +17,6 @@ func FileExists(path string) bool {
 	return !os.IsNotExist(err)
 }
 
-// EnsureDir checks if a directory exists at the specified path,
-// and creates it if it doesn't exist.
-// Returns error if creation fails or if path exists but is not a directory.
-func EnsureDir(dirPath string) error {
-	// Check if the path exists
-	info, err := os.Stat(dirPath)
-	if os.IsNotExist(err) {
-		// Directory doesn't exist, create it
-		err = os.MkdirAll(dirPath, 0755)
-		if err != nil {
-			return fmt.Errorf("failed to create directory: %v", err)
-		}
-		return nil
-	}
-	if err != nil {
-		// Some other error occurred (like permission issues)
-		return fmt.Errorf("error checking directory: %v", err)
-	}
-	if !info.IsDir() {
-		return fmt.Errorf("path exists but is not a directory: %s", dirPath)
-	}
-	// Directory already exists
-	return nil
-}
-
 // ExpandPath handles ~, relative paths, and normalizes them
 func ExpandPath(path string) (string, error) {
 	// Expand tilde (~) to the user's home directory

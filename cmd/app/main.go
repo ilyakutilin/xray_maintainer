@@ -55,18 +55,6 @@ func main() {
 		}
 	}()
 
-	// Check if the workdir exists, if not create it
-	if err := utils.EnsureDir(cfg.Workdir); err != nil {
-		app.sendMsg(
-			cfg.Messages,
-			"Error creating workdir",
-			fmt.Sprintf("Failed to create the main app workdir %s "+
-				"due to the following error:\n%v\nThe process stopped at this point "+
-				"and nothing else was done.", cfg.Workdir, err),
-		)
-		app.logger.Error.Fatalf("Error creating workdir: %v", err)
-	}
-
 	ctx := context.Background()
 
 	if !app.dryRun {
