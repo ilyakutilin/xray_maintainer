@@ -56,9 +56,7 @@ func main() {
 	ctx := context.Background()
 
 	if !app.dryRun {
-		if err := CheckPermissions(
-			ctx, app.xrayServiceName, app.workdir, nil,
-		); err != nil {
+		if err := CheckPermissions(ctx, &app, nil); err != nil {
 			app.logger.Error.Fatal(err)
 		}
 	}

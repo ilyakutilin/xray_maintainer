@@ -11,23 +11,23 @@ import (
 // and execute the service restart command by the current user
 func CheckPermissions(
 	ctx context.Context,
-	serviceName string,
-	workDir string,
+	app *Application,
 	executor utils.CommandExecutor,
 ) error {
 	if executor == nil {
 		executor = utils.DefaultExecutor
 	}
 
-	// TODO: Instead of hardcodig false make it dependable on dryRun
-	if err := utils.CheckDirPermissions(workDir, false); err != nil {
+	if err := utils.CheckDirPermissions(app.workdir, app.dryRun); err != nil {
 		return fmt.Errorf("permission check failed: %w", err)
 	}
 
-	restartCmd := fmt.Sprintf("sudo systemctl restart %s", serviceName)
+	if !app.dryRun {
+		restartCmd := fmt.Sprintf("sudo systemctl restart %s", app.xrayServiceName)
 
-	if err := utils.CheckCommandInSudoers(ctx, restartCmd, executor); err != nil {
-		return fmt.Errorf("permission check failed: %w", err)
+		if err := utils.CheckCommandInSudoers(ctx, restartCmd, executor); err != nil {
+			return fmt.Errorf("permission check failed: %w", err)
+		}
 	}
 
 	return nil

@@ -58,10 +58,19 @@ func TestCheckPermissions(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
+
+			app := Application{
+				// TODO: Instead of hardcoding this should be in the test structure
+				dryRun:          false,
+				workdir:         tt.workDir,
+				xrayServiceName: tt.serviceName,
+			}
+
 			mockExecutor := func(ctx context.Context, cmd string) (string, error) {
 				return tt.mockOutput, tt.mockError
 			}
-			err := CheckPermissions(ctx, tt.serviceName, tt.workDir, mockExecutor)
+
+			err := CheckPermissions(ctx, &app, mockExecutor)
 
 			if tt.wantErr {
 				utils.AssertErrorContains(t, err, tt.errContains)
@@ -89,7 +98,15 @@ func TestCheckPermissionsIntegration(t *testing.T) {
 	defer cancel()
 
 	// This will use the real ExecuteCommand function
-	err = CheckPermissions(ctx, "nonexistent-service", tempDir, nil)
+	err = CheckPermissions(
+		ctx,
+		&Application{
+			dryRun:          false,
+			workdir:         tempDir,
+			xrayServiceName: "nonexistent-service",
+		},
+		nil,
+	)
 
 	// We expect this to fail because the service likely doesn't exist in sudoers
 	// but we can verify the error message structure
