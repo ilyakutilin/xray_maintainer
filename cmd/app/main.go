@@ -11,7 +11,7 @@ import (
 )
 
 type Application struct {
-	debug           bool
+	dryRun          bool
 	logger          *Logger
 	workdir         string
 	xrayServiceName string
@@ -36,8 +36,8 @@ func main() {
 	}
 
 	app := Application{
-		debug:           cfg.Debug,
-		logger:          GetLogger(cfg.Debug),
+		dryRun:          cfg.DryRun,
+		logger:          GetLogger(cfg.DryRun),
 		workdir:         cfg.Workdir,
 		xrayServiceName: cfg.Xray.Server.ServiceName,
 	}
@@ -69,7 +69,7 @@ func main() {
 
 	ctx := context.Background()
 
-	if !app.debug {
+	if !app.dryRun {
 		if err := utils.CheckPermissions(
 			ctx, app.xrayServiceName, app.workdir, nil,
 		); err != nil {

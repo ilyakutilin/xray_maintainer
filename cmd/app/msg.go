@@ -7,7 +7,7 @@ import (
 func (app *Application) getSender(msgCfg Messages) messages.Sender {
 	var sender messages.Sender
 
-	if !app.debug {
+	if !app.dryRun {
 		rawSenders := []messages.Sender{
 			&msgCfg.EmailSender,
 			&msgCfg.TelegramSender,

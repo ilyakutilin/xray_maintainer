@@ -268,7 +268,7 @@ func (app *Application) updateFile(ctx context.Context, file File) error {
 		}
 	}
 
-	if !app.debug {
+	if !app.dryRun {
 		app.logger.Info.Printf("Checking operability of %s after the file update...\n",
 			app.xrayServiceName)
 		if err = utils.CheckOperability(ctx, app.xrayServiceName, nil); err != nil {

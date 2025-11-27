@@ -502,7 +502,7 @@ func TestUpdateFile(t *testing.T) {
 			tempFile := utils.CreateTempFilePath(t)
 
 			testApp := &Application{
-				debug:   true,
+				dryRun:  true,
 				logger:  GetLogger(false),
 				workdir: filepath.Dir(tempFile),
 			}
@@ -604,7 +604,7 @@ func TestUpdateMultipleFiles(t *testing.T) {
 			tempFileTwo := utils.CreateTempFilePath(t)
 
 			testApp := &Application{
-				debug:   true,
+				dryRun:  true,
 				logger:  GetLogger(false),
 				workdir: filepath.Dir(tempFileOne),
 			}
