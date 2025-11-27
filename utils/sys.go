@@ -128,7 +128,8 @@ func CheckPermissions(
 		executor = defaultExecutor
 	}
 
-	if err := checkDirPermissions(workDir); err != nil {
+	// TODO: Instead of hardcodig false make it dependable on dryRun
+	if err := checkDirPermissions(workDir, false); err != nil {
 		return fmt.Errorf("permission check failed: %w", err)
 	}
 

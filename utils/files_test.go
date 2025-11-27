@@ -112,6 +112,7 @@ func TestCheckDirPermissions(t *testing.T) {
 	tests := []struct {
 		name        string
 		path        string
+		readOnly    bool
 		setup       func() error
 		cleanup     func() error
 		wantErr     bool
@@ -159,6 +160,18 @@ func TestCheckDirPermissions(t *testing.T) {
 			errContains: "no write permission for directory",
 		},
 		{
+			name:     "directory without write permission for a read-only check",
+			path:     tempDir,
+			readOnly: true,
+			setup: func() error {
+				return os.Chmod(tempDir, 0555) // read and execute only, no write
+			},
+			cleanup: func() error {
+				return os.Chmod(tempDir, 0755) // restore permissions
+			},
+			wantErr: false,
+		},
+		{
 			name:        "empty path",
 			path:        "",
 			wantErr:     true,
@@ -186,7 +199,7 @@ func TestCheckDirPermissions(t *testing.T) {
 			}
 
 			// Run the function
-			err := checkDirPermissions(tt.path)
+			err := checkDirPermissions(tt.path, tt.readOnly)
 
 			// Check results
 			if tt.wantErr {

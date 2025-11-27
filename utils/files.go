@@ -38,7 +38,7 @@ func ExpandPath(path string) (string, error) {
 
 // checkDirPermissions checks if the current user has read and write permissions
 // to the given path
-func checkDirPermissions(path string) error {
+func checkDirPermissions(path string, readOnly bool) error {
 	// Check if path exists and is a directory
 	fileInfo, err := os.Stat(path)
 	if err != nil {
@@ -58,26 +58,28 @@ func checkDirPermissions(path string) error {
 		return fmt.Errorf("no read permission for directory: %s", path)
 	}
 
-	// Check write permission by creating, writing to, and removing a temporary file
-	tempFile, err := os.CreateTemp(path, "perm_test_")
-	if err != nil {
-		return fmt.Errorf("no write permission for directory: %s", path)
-	}
-	defer os.Remove(tempFile.Name()) // Clean up in case of errors
+	if !readOnly {
+		// Check write permission by creating, writing to, and removing a temporary file
+		tempFile, err := os.CreateTemp(path, "perm_test_")
+		if err != nil {
+			return fmt.Errorf("no write permission for directory: %s", path)
+		}
+		defer os.Remove(tempFile.Name()) // Clean up in case of errors
 
-	// Test actual writing capability
-	testContent := []byte("test")
-	if _, err := tempFile.Write(testContent); err != nil {
-		return fmt.Errorf("no write permission for directory: %s", path)
-	}
+		// Test actual writing capability
+		testContent := []byte("test")
+		if _, err := tempFile.Write(testContent); err != nil {
+			return fmt.Errorf("no write permission for directory: %s", path)
+		}
 
-	if err := tempFile.Close(); err != nil {
-		return fmt.Errorf("cannot close test file: %w", err)
-	}
+		if err := tempFile.Close(); err != nil {
+			return fmt.Errorf("cannot close test file: %w", err)
+		}
 
-	// Clean up the test file
-	if err := os.Remove(tempFile.Name()); err != nil {
-		return fmt.Errorf("cannot remove test file: %w", err)
+		// Clean up the test file
+		if err := os.Remove(tempFile.Name()); err != nil {
+			return fmt.Errorf("cannot remove test file: %w", err)
+		}
 	}
 
 	return nil
