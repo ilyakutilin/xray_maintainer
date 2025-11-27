@@ -36,6 +36,53 @@ func ExpandPath(path string) (string, error) {
 	return filepath.Clean(absPath), nil
 }
 
+// checkDirPermissions checks if the current user has read and write permissions
+// to the given path
+func checkDirPermissions(path string) error {
+	// Check if path exists and is a directory
+	fileInfo, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("path does not exist: %s", path)
+		}
+		return fmt.Errorf("cannot access path: %w", err)
+	}
+
+	// Verify it's actually a directory
+	if !fileInfo.IsDir() {
+		return fmt.Errorf("path is not a directory: %s", path)
+	}
+
+	// Check read permission by attempting to read directory contents
+	if _, err := os.ReadDir(path); err != nil {
+		return fmt.Errorf("no read permission for directory: %s", path)
+	}
+
+	// Check write permission by creating, writing to, and removing a temporary file
+	tempFile, err := os.CreateTemp(path, "perm_test_")
+	if err != nil {
+		return fmt.Errorf("no write permission for directory: %s", path)
+	}
+	defer os.Remove(tempFile.Name()) // Clean up in case of errors
+
+	// Test actual writing capability
+	testContent := []byte("test")
+	if _, err := tempFile.Write(testContent); err != nil {
+		return fmt.Errorf("no write permission for directory: %s", path)
+	}
+
+	if err := tempFile.Close(); err != nil {
+		return fmt.Errorf("cannot close test file: %w", err)
+	}
+
+	// Clean up the test file
+	if err := os.Remove(tempFile.Name()); err != nil {
+		return fmt.Errorf("cannot remove test file: %w", err)
+	}
+
+	return nil
+}
+
 // MakeExecutable makes a file executable
 func MakeExecutable(filePath string) error {
 	return os.Chmod(filePath, 0755)

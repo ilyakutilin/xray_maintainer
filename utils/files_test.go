@@ -93,6 +93,118 @@ func TestExpandPath(t *testing.T) {
 	}
 }
 
+func TestCheckDirPermissions(t *testing.T) {
+	// Create a temporary directory for testing
+	tempDir, err := os.MkdirTemp("", "permission_test")
+	if err != nil {
+		t.Fatalf("Failed to create temp directory: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Create a temporary file (not a directory) for testing
+	tempFile, err := os.CreateTemp("", "test_file")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	tempFile.Close()
+	defer os.Remove(tempFile.Name())
+
+	tests := []struct {
+		name        string
+		path        string
+		setup       func() error
+		cleanup     func() error
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name:    "valid directory with read/write permissions",
+			path:    tempDir,
+			wantErr: false,
+		},
+		{
+			name:        "non-existent directory",
+			path:        filepath.Join(tempDir, "nonexistent"),
+			wantErr:     true,
+			errContains: "path does not exist",
+		},
+		{
+			name:        "path is a file not directory",
+			path:        tempFile.Name(),
+			wantErr:     true,
+			errContains: "path is not a directory",
+		},
+		{
+			name: "directory without read permission",
+			path: tempDir,
+			setup: func() error {
+				return os.Chmod(tempDir, 0333) // write and execute only, no read
+			},
+			cleanup: func() error {
+				return os.Chmod(tempDir, 0755) // restore permissions
+			},
+			wantErr:     true,
+			errContains: "no read permission for directory",
+		},
+		{
+			name: "directory without write permission",
+			path: tempDir,
+			setup: func() error {
+				return os.Chmod(tempDir, 0555) // read and execute only, no write
+			},
+			cleanup: func() error {
+				return os.Chmod(tempDir, 0755) // restore permissions
+			},
+			wantErr:     true,
+			errContains: "no write permission for directory",
+		},
+		{
+			name:        "empty path",
+			path:        "",
+			wantErr:     true,
+			errContains: "path does not exist",
+		},
+		{
+			name:        "root directory",
+			path:        "/",
+			wantErr:     true,
+			errContains: "no write permission for directory",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Run setup if provided
+			if tt.setup != nil {
+				if err := tt.setup(); err != nil {
+					t.Fatalf("Setup failed: %v", err)
+				}
+				// Ensure cleanup runs after test
+				if tt.cleanup != nil {
+					defer tt.cleanup()
+				}
+			}
+
+			// Run the function
+			err := checkDirPermissions(tt.path)
+
+			// Check results
+			if tt.wantErr {
+				AssertErrorContains(t, err, tt.errContains)
+			} else {
+				AssertNoError(t, err)
+			}
+
+			// Run cleanup immediately if not using defer
+			if tt.cleanup != nil && tt.setup == nil {
+				if err := tt.cleanup(); err != nil {
+					t.Errorf("Cleanup failed: %v", err)
+				}
+			}
+		})
+	}
+}
+
 func TestIsZipFile(t *testing.T) {
 	tests := []struct {
 		name     string
