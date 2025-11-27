@@ -55,12 +55,6 @@ func main() {
 		}
 	}()
 
-	if !app.debug {
-		if err := utils.CheckSudo(); err != nil {
-			app.logger.Error.Fatal(err)
-		}
-	}
-
 	// Check if the workdir exists, if not create it
 	if err := utils.EnsureDir(cfg.Workdir); err != nil {
 		app.sendMsg(
@@ -74,6 +68,14 @@ func main() {
 	}
 
 	ctx := context.Background()
+
+	if !app.debug {
+		if err := utils.CheckPermissions(
+			ctx, app.xrayServiceName, app.workdir, nil,
+		); err != nil {
+			app.logger.Error.Fatal(err)
+		}
+	}
 
 	if err := app.updateMultipleFiles(ctx, cfg.Repos, NewFile); err != nil {
 		app.sendMsg(

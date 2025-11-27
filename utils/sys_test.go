@@ -7,30 +7,11 @@ import (
 	"os"
 	"os/exec"
 	"os/user"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 )
-
-func TestCheckSudo(t *testing.T) {
-	err := CheckSudo()
-
-	if os.Geteuid() == 0 {
-		// Running as root - should return nil
-		if err != nil {
-			t.Errorf("Expected nil error when running as root, got %v", err)
-		}
-	} else {
-		// Not running as root - should return error
-		if err == nil {
-			t.Error("Expected error when not running as root, got nil")
-		}
-		expectedErr := "this application requires sudo/root privileges"
-		if err.Error() != expectedErr {
-			t.Errorf("Expected error %q, got %q", expectedErr, err.Error())
-		}
-	}
-}
 
 func TestExecuteCommand(t *testing.T) {
 	tests := []struct {
@@ -376,4 +357,288 @@ func TestCheckOperabilityIntegration(t *testing.T) {
 	if err != nil {
 		t.Errorf("CheckOperability failed: %v", err)
 	}
+}
+
+func TestCheckCommandInSudoers(t *testing.T) {
+	tests := []struct {
+		name            string
+		cmdStr          string
+		mockOutput      string
+		mockError       error
+		expectErrorText string
+	}{
+		{
+			name:   "command found in sudoers",
+			cmdStr: "sudo systemctl restart test-service",
+			mockOutput: `Matching Defaults entries for user on this host:
+    env_reset, mail_badpass, secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin
+
+User user may run the following commands on host:
+    (root) NOPASSWD: /usr/bin/systemctl restart test-service
+    (root) NOPASSWD: /usr/bin/another-command`,
+			mockError:       nil,
+			expectErrorText: "",
+		},
+		{
+			name:   "command not found in sudoers",
+			cmdStr: "sudo systemctl restart test-service",
+			mockOutput: `Matching Defaults entries for user on this host:
+    env_reset, mail_badpass, secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin
+
+User user may run the following commands on host:
+    (root) NOPASSWD: /usr/bin/some-other-command`,
+			mockError:       nil,
+			expectErrorText: "please add the 'systemctl restart test-service' command to sudoers file",
+		},
+		{
+			name:   "command found but requires password",
+			cmdStr: "sudo systemctl restart test-service",
+			mockOutput: `Matching Defaults entries for user on this host:
+    env_reset, mail_badpass, secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin
+
+User user may run the following commands on host:
+    (root) ALL: /usr/bin/systemctl restart test-service`,
+			mockError:       nil,
+			expectErrorText: "please add the 'systemctl restart test-service' command to sudoers file",
+		},
+		{
+			name:            "sudo -l command fails",
+			cmdStr:          "sudo systemctl restart test-service",
+			mockOutput:      "",
+			mockError:       errors.New("sudo: not found"),
+			expectErrorText: "sudo: not found",
+		},
+		{
+			name:   "command with trailing spaces",
+			cmdStr: "sudo systemctl restart test-service",
+			mockOutput: `Matching Defaults entries for user on this host:
+    (root) NOPASSWD: sudo systemctl restart test-service    `,
+			mockError:       nil,
+			expectErrorText: "",
+		},
+		{
+			name:   "command with '.service' vs bare name",
+			cmdStr: "sudo systemctl restart test-service.service",
+			mockOutput: `Matching Defaults entries for user on this host:
+    (root) NOPASSWD: sudo systemctl restart test-service`,
+			mockError:       nil,
+			expectErrorText: "please add the 'systemctl restart test-service.service' command to sudoers file",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			mockExecutor := func(ctx context.Context, cmd string) (string, error) {
+				return tt.mockOutput, tt.mockError
+			}
+
+			err := checkCommandInSudoers(ctx, tt.cmdStr, mockExecutor)
+
+			if tt.expectErrorText != "" {
+				AssertErrorContains(t, err, tt.expectErrorText)
+			} else {
+				AssertNoError(t, err)
+			}
+		})
+	}
+}
+
+func TestCheckDirPermissions(t *testing.T) {
+	// Create a temporary directory for testing
+	tempDir, err := os.MkdirTemp("", "permission_test")
+	if err != nil {
+		t.Fatalf("Failed to create temp directory: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Create a temporary file (not a directory) for testing
+	tempFile, err := os.CreateTemp("", "test_file")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	tempFile.Close()
+	defer os.Remove(tempFile.Name())
+
+	tests := []struct {
+		name        string
+		path        string
+		setup       func() error
+		cleanup     func() error
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name:    "valid directory with read/write permissions",
+			path:    tempDir,
+			wantErr: false,
+		},
+		{
+			name:        "non-existent directory",
+			path:        filepath.Join(tempDir, "nonexistent"),
+			wantErr:     true,
+			errContains: "path does not exist",
+		},
+		{
+			name:        "path is a file not directory",
+			path:        tempFile.Name(),
+			wantErr:     true,
+			errContains: "path is not a directory",
+		},
+		{
+			name: "directory without read permission",
+			path: tempDir,
+			setup: func() error {
+				return os.Chmod(tempDir, 0333) // write and execute only, no read
+			},
+			cleanup: func() error {
+				return os.Chmod(tempDir, 0755) // restore permissions
+			},
+			wantErr:     true,
+			errContains: "no read permission for directory",
+		},
+		{
+			name: "directory without write permission",
+			path: tempDir,
+			setup: func() error {
+				return os.Chmod(tempDir, 0555) // read and execute only, no write
+			},
+			cleanup: func() error {
+				return os.Chmod(tempDir, 0755) // restore permissions
+			},
+			wantErr:     true,
+			errContains: "no write permission for directory",
+		},
+		{
+			name:        "empty path",
+			path:        "",
+			wantErr:     true,
+			errContains: "path does not exist",
+		},
+		{
+			name:        "root directory",
+			path:        "/",
+			wantErr:     true,
+			errContains: "no write permission for directory",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Run setup if provided
+			if tt.setup != nil {
+				if err := tt.setup(); err != nil {
+					t.Fatalf("Setup failed: %v", err)
+				}
+				// Ensure cleanup runs after test
+				if tt.cleanup != nil {
+					defer tt.cleanup()
+				}
+			}
+
+			// Run the function
+			err := checkDirPermissions(tt.path)
+
+			// Check results
+			if tt.wantErr {
+				AssertErrorContains(t, err, tt.errContains)
+			} else {
+				AssertNoError(t, err)
+			}
+
+			// Run cleanup immediately if not using defer
+			if tt.cleanup != nil && tt.setup == nil {
+				if err := tt.cleanup(); err != nil {
+					t.Errorf("Cleanup failed: %v", err)
+				}
+			}
+		})
+	}
+}
+
+func TestCheckPermissions(t *testing.T) {
+	// Create a temporary directory for testing
+	tempDir, err := os.MkdirTemp("", "check_permissions_test")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	tests := []struct {
+		name        string
+		serviceName string
+		workDir     string
+		mockOutput  string
+		mockError   error
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name:        "successful permission check",
+			serviceName: "test-service",
+			workDir:     tempDir,
+			mockOutput:  `(root) NOPASSWD: sudo systemctl restart test-service`,
+			mockError:   nil,
+			wantErr:     false,
+		},
+		{
+			name:        "workdir permission failure",
+			serviceName: "test-service",
+			workDir:     "/nonexistent/path",
+			mockOutput:  `(root) NOPASSWD: sudo systemctl restart test-service`,
+			mockError:   nil,
+			wantErr:     true,
+			errContains: "permission check failed",
+		},
+		{
+			name:        "sudoers check failure",
+			serviceName: "test-service",
+			workDir:     tempDir,
+			mockOutput:  "",
+			mockError:   errors.New("sudo command failed"),
+			wantErr:     true,
+			errContains: "permission check failed",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			mockExecutor := func(ctx context.Context, cmd string) (string, error) {
+				return tt.mockOutput, tt.mockError
+			}
+			err := CheckPermissions(ctx, tt.serviceName, tt.workDir, mockExecutor)
+
+			if tt.wantErr {
+				AssertErrorContains(t, err, tt.errContains)
+			} else {
+				AssertNoError(t, err)
+			}
+		})
+	}
+}
+
+func TestCheckPermissionsIntegration(t *testing.T) {
+	// This test can be run with go test -tags=integration
+	// It tests with the real executor against the actual system
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
+	tempDir, err := os.MkdirTemp("", "integration_test")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// This will use the real ExecuteCommand function
+	err = CheckPermissions(ctx, "nonexistent-service", tempDir, nil)
+
+	// We expect this to fail because the service likely doesn't exist in sudoers
+	// but we can verify the error message structure
+	AssertErrorContains(t, err, "permission check failed: please add the 'systemctl "+
+		"restart nonexistent-service' command to sudoers file")
 }
