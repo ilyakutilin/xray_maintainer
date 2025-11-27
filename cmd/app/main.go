@@ -59,7 +59,7 @@ func main() {
 		app.logger.Error.Fatal(err)
 	}
 
-	if err := app.updateMultipleFiles(ctx, cfg.Repos, NewFile); err != nil {
+	if err := app.updateMultipleFiles(ctx, cfg.Repos, app.dryRun); err != nil {
 		app.sendMsg(
 			cfg.Messages,
 			"Error updating files",

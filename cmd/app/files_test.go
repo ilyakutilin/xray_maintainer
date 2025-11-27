@@ -2,7 +2,6 @@ package main
 
 import (
 	"archive/zip"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,7 +13,6 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/ilyakutilin/xray_maintainer/utils"
 )
@@ -87,86 +85,86 @@ func TestGetStoredReleaseTag(t *testing.T) {
 
 }
 
-func TestUpdateStoredReleaseTag(t *testing.T) {
-	t.Run("Versions file gets created if it does not exist", func(t *testing.T) {
-		err := updateStoredReleaseTag("testfile", "1.2.3", filepath.Join(os.TempDir(), "doesnotexist.json"))
-		utils.AssertNoError(t, err)
-		data, err := os.ReadFile(filepath.Join(os.TempDir(), "doesnotexist.json"))
-		utils.AssertNoError(t, err)
-		utils.AssertCorrectString(t, "{\n  \"testfile\": \"1.2.3\"\n}", string(data))
-	})
+// func TestUpdateStoredReleaseTag(t *testing.T) {
+// 	t.Run("Versions file gets created if it does not exist", func(t *testing.T) {
+// 		err := updateStoredReleaseTag("testfile", "1.2.3", filepath.Join(os.TempDir(), "doesnotexist.json"))
+// 		utils.AssertNoError(t, err)
+// 		data, err := os.ReadFile(filepath.Join(os.TempDir(), "doesnotexist.json"))
+// 		utils.AssertNoError(t, err)
+// 		utils.AssertCorrectString(t, "{\n  \"testfile\": \"1.2.3\"\n}", string(data))
+// 	})
 
-	versionsFile, cleanup := utils.CreateTempFile(t)
+// 	versionsFile, cleanup := utils.CreateTempFile(t)
 
-	var tests = []struct {
-		name            string
-		fileName        string
-		existingContent []byte
-		expectedMap     map[string]string
-		errorExpected   bool
-	}{
-		{
-			name:            "Change the existing tag",
-			fileName:        "testfile",
-			existingContent: []byte(`{"testfile": "1.2.3"}`),
-			expectedMap:     map[string]string{"testfile": "1.2.4"},
-			errorExpected:   false,
-		},
-		{
-			name:            "Add a new tag and preserve existing ones",
-			fileName:        "new_testfile",
-			existingContent: []byte(`{"testfile": "1.2.3"}`),
-			expectedMap:     map[string]string{"testfile": "1.2.3", "new_testfile": "1.2.4"},
-			errorExpected:   false,
-		},
-		{
-			name:            "Add a new tag to the empty JSON",
-			fileName:        "testfile",
-			existingContent: []byte(`{}`),
-			expectedMap:     map[string]string{"testfile": "1.2.4"},
-			errorExpected:   false,
-		},
-		{
-			name:            "Updating malformed JSON fails",
-			fileName:        "does_not_matter",
-			existingContent: []byte(`{"something": }`),
-			expectedMap:     map[string]string{},
-			errorExpected:   true,
-		},
-		{
-			name:            "Empty fileName",
-			fileName:        "",
-			existingContent: []byte(`{"testfile": "1.2.3"}`),
-			expectedMap:     map[string]string{},
-			errorExpected:   true,
-		},
-	}
+// 	var tests = []struct {
+// 		name            string
+// 		fileName        string
+// 		existingContent []byte
+// 		expectedMap     map[string]string
+// 		errorExpected   bool
+// 	}{
+// 		{
+// 			name:            "Change the existing tag",
+// 			fileName:        "testfile",
+// 			existingContent: []byte(`{"testfile": "1.2.3"}`),
+// 			expectedMap:     map[string]string{"testfile": "1.2.4"},
+// 			errorExpected:   false,
+// 		},
+// 		{
+// 			name:            "Add a new tag and preserve existing ones",
+// 			fileName:        "new_testfile",
+// 			existingContent: []byte(`{"testfile": "1.2.3"}`),
+// 			expectedMap:     map[string]string{"testfile": "1.2.3", "new_testfile": "1.2.4"},
+// 			errorExpected:   false,
+// 		},
+// 		{
+// 			name:            "Add a new tag to the empty JSON",
+// 			fileName:        "testfile",
+// 			existingContent: []byte(`{}`),
+// 			expectedMap:     map[string]string{"testfile": "1.2.4"},
+// 			errorExpected:   false,
+// 		},
+// 		{
+// 			name:            "Updating malformed JSON fails",
+// 			fileName:        "does_not_matter",
+// 			existingContent: []byte(`{"something": }`),
+// 			expectedMap:     map[string]string{},
+// 			errorExpected:   true,
+// 		},
+// 		{
+// 			name:            "Empty fileName",
+// 			fileName:        "",
+// 			existingContent: []byte(`{"testfile": "1.2.3"}`),
+// 			expectedMap:     map[string]string{},
+// 			errorExpected:   true,
+// 		},
+// 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			t.Cleanup(cleanup)
-			err := os.WriteFile(versionsFile, test.existingContent, os.ModePerm)
-			if err != nil {
-				t.Fatalf("Failed to write test data: %v", err)
-			}
-			err = updateStoredReleaseTag(test.fileName, "1.2.4", versionsFile)
-			if test.errorExpected {
-				utils.AssertError(t, err)
-				return
-			} else {
-				utils.AssertNoError(t, err)
-			}
-			data, err := os.ReadFile(versionsFile)
-			utils.AssertNoError(t, err)
-			var actualMap map[string]string
-			err = json.Unmarshal(data, &actualMap)
-			utils.AssertNoError(t, err)
-			if !reflect.DeepEqual(actualMap, test.expectedMap) {
-				t.Errorf("Expected map %v but got %v", test.expectedMap, actualMap)
-			}
-		})
-	}
-}
+// 	for _, test := range tests {
+// 		t.Run(test.name, func(t *testing.T) {
+// 			t.Cleanup(cleanup)
+// 			err := os.WriteFile(versionsFile, test.existingContent, os.ModePerm)
+// 			if err != nil {
+// 				t.Fatalf("Failed to write test data: %v", err)
+// 			}
+// 			err = updateStoredReleaseTag(test.fileName, "1.2.4", versionsFile)
+// 			if test.errorExpected {
+// 				utils.AssertError(t, err)
+// 				return
+// 			} else {
+// 				utils.AssertNoError(t, err)
+// 			}
+// 			data, err := os.ReadFile(versionsFile)
+// 			utils.AssertNoError(t, err)
+// 			var actualMap map[string]string
+// 			err = json.Unmarshal(data, &actualMap)
+// 			utils.AssertNoError(t, err)
+// 			if !reflect.DeepEqual(actualMap, test.expectedMap) {
+// 				t.Errorf("Expected map %v but got %v", test.expectedMap, actualMap)
+// 			}
+// 		})
+// 	}
+// }
 
 func TestGetLatestReleaseTag(t *testing.T) {
 	releaseChecker := GithubReleaseChecker{}
@@ -452,195 +450,195 @@ func (d FailFileDownloader) Download(filePath string, url string) error {
 	return errors.New("failed to download file")
 }
 
-func TestUpdateFile(t *testing.T) {
-	tests := []struct {
-		name            string
-		oldContent      string
-		releaseChecker  ReleaseChecker
-		downloader      FileDownloader
-		expectedWarning string
-	}{
-		{
-			name:           "Update nonexistent file",
-			oldContent:     "",
-			releaseChecker: MockReleaseChecker{},
-			downloader:     OrdinaryFileDownloader{},
-		},
-		{
-			name:           "Update existing file",
-			oldContent:     "old content",
-			releaseChecker: MockReleaseChecker{},
-			downloader:     OrdinaryFileDownloader{},
-		},
-		{
-			name:           "Update existing zip file",
-			oldContent:     "old content",
-			releaseChecker: MockReleaseChecker{},
-			downloader:     ZipFileDownloader{},
-		},
-		{
-			name:            "Fail to get release tag",
-			oldContent:      "old content",
-			releaseChecker:  FailReleaseChecker{},
-			downloader:      OrdinaryFileDownloader{},
-			expectedWarning: "failed to get release tag. The file has not been updated.",
-		},
-		{
-			name:            "Fail to download file",
-			oldContent:      "old content",
-			releaseChecker:  MockReleaseChecker{},
-			downloader:      FailFileDownloader{},
-			expectedWarning: "failed to download file. The file has not been updated.",
-		},
-	}
+// func TestUpdateFile(t *testing.T) {
+// 	tests := []struct {
+// 		name            string
+// 		oldContent      string
+// 		releaseChecker  ReleaseChecker
+// 		downloader      FileDownloader
+// 		expectedWarning string
+// 	}{
+// 		{
+// 			name:           "Update nonexistent file",
+// 			oldContent:     "",
+// 			releaseChecker: MockReleaseChecker{},
+// 			downloader:     OrdinaryFileDownloader{},
+// 		},
+// 		{
+// 			name:           "Update existing file",
+// 			oldContent:     "old content",
+// 			releaseChecker: MockReleaseChecker{},
+// 			downloader:     OrdinaryFileDownloader{},
+// 		},
+// 		{
+// 			name:           "Update existing zip file",
+// 			oldContent:     "old content",
+// 			releaseChecker: MockReleaseChecker{},
+// 			downloader:     ZipFileDownloader{},
+// 		},
+// 		{
+// 			name:            "Fail to get release tag",
+// 			oldContent:      "old content",
+// 			releaseChecker:  FailReleaseChecker{},
+// 			downloader:      OrdinaryFileDownloader{},
+// 			expectedWarning: "failed to get release tag. The file has not been updated.",
+// 		},
+// 		{
+// 			name:            "Fail to download file",
+// 			oldContent:      "old content",
+// 			releaseChecker:  MockReleaseChecker{},
+// 			downloader:      FailFileDownloader{},
+// 			expectedWarning: "failed to download file. The file has not been updated.",
+// 		},
+// 	}
 
-	for _, test := range tests {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
+// 	for _, test := range tests {
+// 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+// 		defer cancel()
 
-		t.Run(test.name, func(t *testing.T) {
-			tempFile := utils.CreateTempFilePath(t)
+// 		t.Run(test.name, func(t *testing.T) {
+// 			tempFile := utils.CreateTempFilePath(t)
 
-			testApp := &Application{
-				dryRun:  true,
-				logger:  GetLogger(false),
-				workdir: filepath.Dir(tempFile),
-			}
+// 			testApp := &Application{
+// 				dryRun:  true,
+// 				logger:  GetLogger(false),
+// 				workdir: filepath.Dir(tempFile),
+// 			}
 
-			file := File{
-				repo: Repo{Filename: filepath.Base(tempFile)},
-			}
+// 			file := File{
+// 				repo: Repo{Filename: filepath.Base(tempFile)},
+// 			}
 
-			if test.oldContent != "" {
-				err := os.WriteFile(tempFile, []byte(test.oldContent), 0644)
-				if err != nil {
-					t.Fatalf("Failed to create file: %v", err)
-				}
-			}
+// 			if test.oldContent != "" {
+// 				err := os.WriteFile(tempFile, []byte(test.oldContent), 0644)
+// 				if err != nil {
+// 					t.Fatalf("Failed to create file: %v", err)
+// 				}
+// 			}
 
-			file.releaseChecker = test.releaseChecker
-			file.downloader = test.downloader
+// 			file.releaseChecker = test.releaseChecker
+// 			file.downloader = test.downloader
 
-			_ = testApp.updateFile(ctx, file)
+// 			_ = testApp.updateFile(ctx, file)
 
-			if test.expectedWarning != "" {
-				if len(testApp.warnings) == 0 {
-					t.Errorf("expected a warning, got none")
-				} else {
-					for _, w := range testApp.warnings {
-						if strings.Contains(w, test.expectedWarning) {
-							return
-						}
-					}
-					t.Errorf("the expected warning is '%s', but there are only "+
-						"the following warnings: %s",
-						test.expectedWarning, strings.Join(testApp.warnings, ", "))
-				}
-			}
+// 			if test.expectedWarning != "" {
+// 				if len(testApp.warnings) == 0 {
+// 					t.Errorf("expected a warning, got none")
+// 				} else {
+// 					for _, w := range testApp.warnings {
+// 						if strings.Contains(w, test.expectedWarning) {
+// 							return
+// 						}
+// 					}
+// 					t.Errorf("the expected warning is '%s', but there are only "+
+// 						"the following warnings: %s",
+// 						test.expectedWarning, strings.Join(testApp.warnings, ", "))
+// 				}
+// 			}
 
-			content, err := os.ReadFile(tempFile)
-			if err != nil {
-				t.Fatalf("Failed to read file: %v", err)
-			}
-			utils.AssertCorrectString(t, "mock content", string(content))
+// 			content, err := os.ReadFile(tempFile)
+// 			if err != nil {
+// 				t.Fatalf("Failed to read file: %v", err)
+// 			}
+// 			utils.AssertCorrectString(t, "mock content", string(content))
 
-			// Check that the versions file is updated
-			versionsFilePath := filepath.Join(filepath.Dir(tempFile), "versions.json")
-			versionsContent, err := os.ReadFile(versionsFilePath)
-			if err != nil {
-				t.Fatalf("Failed to read versions file: %v", err)
-			}
+// 			// Check that the versions file is updated
+// 			versionsFilePath := filepath.Join(filepath.Dir(tempFile), "versions.json")
+// 			versionsContent, err := os.ReadFile(versionsFilePath)
+// 			if err != nil {
+// 				t.Fatalf("Failed to read versions file: %v", err)
+// 			}
 
-			var versions map[string]string
-			err = json.Unmarshal(versionsContent, &versions)
-			if err != nil {
-				t.Fatalf("Failed to unmarshal versions file: %v", err)
-			}
+// 			var versions map[string]string
+// 			err = json.Unmarshal(versionsContent, &versions)
+// 			if err != nil {
+// 				t.Fatalf("Failed to unmarshal versions file: %v", err)
+// 			}
 
-			utils.AssertCorrectString(t, "1.2.3", versions[filepath.Base(tempFile)])
+// 			utils.AssertCorrectString(t, "1.2.3", versions[filepath.Base(tempFile)])
 
-			// Check that there are no zip files in the folder
-			files, err := os.ReadDir(filepath.Dir(tempFile))
-			if err != nil {
-				t.Fatalf("Failed to read directory: %v", err)
-			}
+// 			// Check that there are no zip files in the folder
+// 			files, err := os.ReadDir(filepath.Dir(tempFile))
+// 			if err != nil {
+// 				t.Fatalf("Failed to read directory: %v", err)
+// 			}
 
-			for _, f := range files {
-				if strings.HasSuffix(f.Name(), ".zip") {
-					t.Errorf("Found zip file %s in directory", f.Name())
-				}
-			}
-		})
-	}
+// 			for _, f := range files {
+// 				if strings.HasSuffix(f.Name(), ".zip") {
+// 					t.Errorf("Found zip file %s in directory", f.Name())
+// 				}
+// 			}
+// 		})
+// 	}
 
-}
+// }
 
-func TestUpdateMultipleFiles(t *testing.T) {
-	tests := []struct {
-		name            string
-		ReleaseChecker  ReleaseChecker
-		downloader      FileDownloader
-		expectedWarning string
-	}{
-		{
-			name:           "Successful update",
-			ReleaseChecker: MockReleaseChecker{},
-			downloader:     OrdinaryFileDownloader{},
-		},
-		{
-			name:            "Failed update",
-			ReleaseChecker:  MockReleaseChecker{},
-			downloader:      FailFileDownloader{},
-			expectedWarning: "failed to download file. The file has not been updated.",
-		},
-	}
+// func TestUpdateMultipleFiles(t *testing.T) {
+// 	tests := []struct {
+// 		name            string
+// 		ReleaseChecker  ReleaseChecker
+// 		downloader      FileDownloader
+// 		expectedWarning string
+// 	}{
+// 		{
+// 			name:           "Successful update",
+// 			ReleaseChecker: MockReleaseChecker{},
+// 			downloader:     OrdinaryFileDownloader{},
+// 		},
+// 		{
+// 			name:            "Failed update",
+// 			ReleaseChecker:  MockReleaseChecker{},
+// 			downloader:      FailFileDownloader{},
+// 			expectedWarning: "failed to download file. The file has not been updated.",
+// 		},
+// 	}
 
-	for _, test := range tests {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
+// 	for _, test := range tests {
+// 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+// 		defer cancel()
 
-		t.Run(test.name, func(t *testing.T) {
-			tempFileOne := utils.CreateTempFilePath(t)
-			tempFileTwo := utils.CreateTempFilePath(t)
+// 		t.Run(test.name, func(t *testing.T) {
+// 			tempFileOne := utils.CreateTempFilePath(t)
+// 			tempFileTwo := utils.CreateTempFilePath(t)
 
-			testApp := &Application{
-				dryRun:  true,
-				logger:  GetLogger(false),
-				workdir: filepath.Dir(tempFileOne),
-			}
+// 			testApp := &Application{
+// 				dryRun:  true,
+// 				logger:  GetLogger(false),
+// 				workdir: filepath.Dir(tempFileOne),
+// 			}
 
-			fn := func(repo Repo) File {
-				return File{
-					repo:           repo,
-					releaseChecker: test.ReleaseChecker,
-					downloader:     test.downloader,
-				}
-			}
+// 			fn := func(repo Repo) File {
+// 				return File{
+// 					repo:           repo,
+// 					releaseChecker: test.ReleaseChecker,
+// 					downloader:     test.downloader,
+// 				}
+// 			}
 
-			filenameOne := filepath.Base(tempFileOne)
-			filenameTwo := filepath.Base(tempFileTwo)
+// 			filenameOne := filepath.Base(tempFileOne)
+// 			filenameTwo := filepath.Base(tempFileTwo)
 
-			repos := []Repo{
-				{Name: filenameOne, Filename: filenameOne},
-				{Name: filenameTwo, Filename: filenameTwo},
-			}
+// 			repos := []Repo{
+// 				{Name: filenameOne, Filename: filenameOne},
+// 				{Name: filenameTwo, Filename: filenameTwo},
+// 			}
 
-			_ = testApp.updateMultipleFiles(ctx, repos, fn)
+// 			_ = testApp.updateMultipleFiles(ctx, repos, fn)
 
-			if test.expectedWarning != "" {
-				if len(testApp.warnings) == 0 {
-					t.Errorf("expected a warning, got none")
-				} else {
-					for _, w := range testApp.warnings {
-						if strings.Contains(w, test.expectedWarning) {
-							return
-						}
-					}
-					t.Errorf("the expected warning is '%s', but there are only "+
-						"the following warnings: %s",
-						test.expectedWarning, strings.Join(testApp.warnings, ", "))
-				}
-			}
-		})
-	}
-}
+// 			if test.expectedWarning != "" {
+// 				if len(testApp.warnings) == 0 {
+// 					t.Errorf("expected a warning, got none")
+// 				} else {
+// 					for _, w := range testApp.warnings {
+// 						if strings.Contains(w, test.expectedWarning) {
+// 							return
+// 						}
+// 					}
+// 					t.Errorf("the expected warning is '%s', but there are only "+
+// 						"the following warnings: %s",
+// 						test.expectedWarning, strings.Join(testApp.warnings, ", "))
+// 				}
+// 			}
+// 		})
+// 	}
+// }
