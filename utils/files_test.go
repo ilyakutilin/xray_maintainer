@@ -199,7 +199,7 @@ func TestCheckDirPermissions(t *testing.T) {
 			}
 
 			// Run the function
-			err := checkDirPermissions(tt.path, tt.readOnly)
+			err := CheckDirPermissions(tt.path, tt.readOnly)
 
 			// Check results
 			if tt.wantErr {

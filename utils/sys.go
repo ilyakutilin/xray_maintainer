@@ -34,13 +34,13 @@ func ExecuteCommand(ctx context.Context, cmdStr string) (string, error) {
 
 type CommandExecutor func(context.Context, string) (string, error)
 
-var defaultExecutor CommandExecutor = ExecuteCommand
+var DefaultExecutor CommandExecutor = ExecuteCommand
 
 func RestartService(
 	ctx context.Context, serviceName string, executor CommandExecutor,
 ) error {
 	if executor == nil {
-		executor = defaultExecutor
+		executor = DefaultExecutor
 	}
 
 	_, err := executor(ctx, fmt.Sprintf("sudo systemctl restart %s", serviceName))
@@ -51,7 +51,7 @@ func CheckServiceStatus(
 	ctx context.Context, serviceName string, executor CommandExecutor,
 ) (bool, error) {
 	if executor == nil {
-		executor = defaultExecutor
+		executor = DefaultExecutor
 	}
 
 	for range 5 {
@@ -85,9 +85,9 @@ func CheckOperability(
 	return nil
 }
 
-// checkCommandInSudoers checks if the command is added to the sudoers file
+// CheckCommandInSudoers checks if the command is added to the sudoers file
 // and its execution by the current user is allowed without a password
-func checkCommandInSudoers(
+func CheckCommandInSudoers(
 	ctx context.Context, cmdStr string, executor CommandExecutor,
 ) error {
 	output, err := executor(ctx, "sudo -l")
@@ -114,29 +114,6 @@ func checkCommandInSudoers(
 		return fmt.Errorf("please add the '%s' command to sudoers file: run "+
 			"'sudo visudo' and add the line 'username ALL=(root) NOPASSWD: %s' "+
 			"where username is your user name", trimmedTarget, trimmedTarget)
-	}
-
-	return nil
-}
-
-// CheckPermissions checks the permissions to read / write to the workdir
-// and execute the service restart command by the current user
-func CheckPermissions(
-	ctx context.Context, serviceName string, workDir string, executor CommandExecutor,
-) error {
-	if executor == nil {
-		executor = defaultExecutor
-	}
-
-	// TODO: Instead of hardcodig false make it dependable on dryRun
-	if err := checkDirPermissions(workDir, false); err != nil {
-		return fmt.Errorf("permission check failed: %w", err)
-	}
-
-	restartCmd := fmt.Sprintf("sudo systemctl restart %s", serviceName)
-
-	if err := checkCommandInSudoers(ctx, restartCmd, executor); err != nil {
-		return fmt.Errorf("permission check failed: %w", err)
 	}
 
 	return nil

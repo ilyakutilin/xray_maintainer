@@ -6,8 +6,6 @@ import (
 	"log"
 	"os"
 	"runtime/debug"
-
-	"github.com/ilyakutilin/xray_maintainer/utils"
 )
 
 type Application struct {
@@ -58,7 +56,7 @@ func main() {
 	ctx := context.Background()
 
 	if !app.dryRun {
-		if err := utils.CheckPermissions(
+		if err := CheckPermissions(
 			ctx, app.xrayServiceName, app.workdir, nil,
 		); err != nil {
 			app.logger.Error.Fatal(err)

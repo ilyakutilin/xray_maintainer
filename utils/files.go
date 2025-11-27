@@ -36,9 +36,9 @@ func ExpandPath(path string) (string, error) {
 	return filepath.Clean(absPath), nil
 }
 
-// checkDirPermissions checks if the current user has read and write permissions
+// CheckDirPermissions checks if the current user has read and write permissions
 // to the given path
-func checkDirPermissions(path string, readOnly bool) error {
+func CheckDirPermissions(path string, readOnly bool) error {
 	// Check if path exists and is a directory
 	fileInfo, err := os.Stat(path)
 	if err != nil {
