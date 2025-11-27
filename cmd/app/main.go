@@ -55,10 +55,8 @@ func main() {
 
 	ctx := context.Background()
 
-	if !app.dryRun {
-		if err := CheckPermissions(ctx, &app, nil); err != nil {
-			app.logger.Error.Fatal(err)
-		}
+	if err := CheckPermissions(ctx, &app, nil); err != nil {
+		app.logger.Error.Fatal(err)
 	}
 
 	if err := app.updateMultipleFiles(ctx, cfg.Repos, NewFile); err != nil {
