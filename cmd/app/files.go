@@ -128,7 +128,7 @@ func updateStoredReleaseTag(
 		return err
 	}
 
-	if write {
+	if !write {
 		return nil
 	}
 	return os.WriteFile(versionFilePath, newData, 0644)
@@ -165,7 +165,6 @@ func (rc GithubReleaseChecker) UpdateStoredReleaseTag(
 func (rc DryRunReleaseChecker) UpdateStoredReleaseTag(
 	fileName, newVersion, versionFilePath string,
 ) error {
-	// TODO: This actually needs changing
 	return updateStoredReleaseTag(fileName, newVersion, versionFilePath, false)
 }
 
