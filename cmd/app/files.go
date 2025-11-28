@@ -413,6 +413,7 @@ func (app *Application) updateFile(ctx context.Context, file File) error {
 		}
 	}
 
+	// TODO: Instead of checking operability after updating each file, do this only once
 	app.logger.Info.Printf("Checking operability of %s after the file update...\n",
 		app.xrayServiceName)
 	if err = utils.CheckOperability(ctx, app.xrayServiceName, nil); err != nil {
