@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -35,13 +34,13 @@ func ExecuteCommand(ctx context.Context, cmdStr string) (string, error) {
 
 type CommandExecutor func(context.Context, string) (string, error)
 
-var defaultExecutor CommandExecutor = ExecuteCommand
+var DefaultExecutor CommandExecutor = ExecuteCommand
 
 func RestartService(
 	ctx context.Context, serviceName string, executor CommandExecutor,
 ) error {
 	if executor == nil {
-		executor = defaultExecutor
+		executor = DefaultExecutor
 	}
 
 	_, err := executor(ctx, fmt.Sprintf("sudo systemctl restart %s", serviceName))
@@ -52,7 +51,7 @@ func CheckServiceStatus(
 	ctx context.Context, serviceName string, executor CommandExecutor,
 ) (bool, error) {
 	if executor == nil {
-		executor = defaultExecutor
+		executor = DefaultExecutor
 	}
 
 	for range 5 {
@@ -86,9 +85,9 @@ func CheckOperability(
 	return nil
 }
 
-// checkCommandInSudoers checks if the command is added to the sudoers file
+// CheckCommandInSudoers checks if the command is added to the sudoers file
 // and its execution by the current user is allowed without a password
-func checkCommandInSudoers(
+func CheckCommandInSudoers(
 	ctx context.Context, cmdStr string, executor CommandExecutor,
 ) error {
 	output, err := executor(ctx, "sudo -l")
@@ -115,75 +114,6 @@ func checkCommandInSudoers(
 		return fmt.Errorf("please add the '%s' command to sudoers file: run "+
 			"'sudo visudo' and add the line 'username ALL=(root) NOPASSWD: %s' "+
 			"where username is your user name", trimmedTarget, trimmedTarget)
-	}
-
-	return nil
-}
-
-// checkDirPermissions checks if the current user has read and write permissions
-// to the given path
-func checkDirPermissions(path string) error {
-	// Check if path exists and is a directory
-	fileInfo, err := os.Stat(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return fmt.Errorf("path does not exist: %s", path)
-		}
-		return fmt.Errorf("cannot access path: %w", err)
-	}
-
-	// Verify it's actually a directory
-	if !fileInfo.IsDir() {
-		return fmt.Errorf("path is not a directory: %s", path)
-	}
-
-	// Check read permission by attempting to read directory contents
-	if _, err := os.ReadDir(path); err != nil {
-		return fmt.Errorf("no read permission for directory: %s", path)
-	}
-
-	// Check write permission by creating, writing to, and removing a temporary file
-	tempFile, err := os.CreateTemp(path, "perm_test_")
-	if err != nil {
-		return fmt.Errorf("no write permission for directory: %s", path)
-	}
-	defer os.Remove(tempFile.Name()) // Clean up in case of errors
-
-	// Test actual writing capability
-	testContent := []byte("test")
-	if _, err := tempFile.Write(testContent); err != nil {
-		return fmt.Errorf("no write permission for directory: %s", path)
-	}
-
-	if err := tempFile.Close(); err != nil {
-		return fmt.Errorf("cannot close test file: %w", err)
-	}
-
-	// Clean up the test file
-	if err := os.Remove(tempFile.Name()); err != nil {
-		return fmt.Errorf("cannot remove test file: %w", err)
-	}
-
-	return nil
-}
-
-// CheckPermissions checks the permissions to read / write to the workdir
-// and execute the service restart command by the current user
-func CheckPermissions(
-	ctx context.Context, serviceName string, workDir string, executor CommandExecutor,
-) error {
-	if executor == nil {
-		executor = defaultExecutor
-	}
-
-	if err := checkDirPermissions(workDir); err != nil {
-		return fmt.Errorf("permission check failed: %w", err)
-	}
-
-	restartCmd := fmt.Sprintf("sudo systemctl restart %s", serviceName)
-
-	if err := checkCommandInSudoers(ctx, restartCmd, executor); err != nil {
-		return fmt.Errorf("permission check failed: %w", err)
 	}
 
 	return nil

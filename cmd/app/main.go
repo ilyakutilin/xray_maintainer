@@ -6,12 +6,10 @@ import (
 	"log"
 	"os"
 	"runtime/debug"
-
-	"github.com/ilyakutilin/xray_maintainer/utils"
 )
 
 type Application struct {
-	debug           bool
+	dryRun          bool
 	logger          *Logger
 	workdir         string
 	xrayServiceName string
@@ -36,8 +34,8 @@ func main() {
 	}
 
 	app := Application{
-		debug:           cfg.Debug,
-		logger:          GetLogger(cfg.Debug),
+		dryRun:          cfg.DryRun,
+		logger:          GetLogger(cfg.DryRun),
 		workdir:         cfg.Workdir,
 		xrayServiceName: cfg.Xray.Server.ServiceName,
 	}
@@ -55,29 +53,13 @@ func main() {
 		}
 	}()
 
-	// Check if the workdir exists, if not create it
-	if err := utils.EnsureDir(cfg.Workdir); err != nil {
-		app.sendMsg(
-			cfg.Messages,
-			"Error creating workdir",
-			fmt.Sprintf("Failed to create the main app workdir %s "+
-				"due to the following error:\n%v\nThe process stopped at this point "+
-				"and nothing else was done.", cfg.Workdir, err),
-		)
-		app.logger.Error.Fatalf("Error creating workdir: %v", err)
-	}
-
 	ctx := context.Background()
 
-	if !app.debug {
-		if err := utils.CheckPermissions(
-			ctx, app.xrayServiceName, app.workdir, nil,
-		); err != nil {
-			app.logger.Error.Fatal(err)
-		}
+	if err := CheckPermissions(ctx, &app, nil); err != nil {
+		app.logger.Error.Fatal(err)
 	}
 
-	if err := app.updateMultipleFiles(ctx, cfg.Repos, NewFile); err != nil {
+	if err := app.updateMultipleFiles(ctx, cfg.Repos, app.dryRun); err != nil {
 		app.sendMsg(
 			cfg.Messages,
 			"Error updating files",

@@ -22,7 +22,7 @@ type CFCreds struct {
 }
 
 func (app Application) getCFCreds(ctx context.Context, cfCredFilePath string) (string, error) {
-	if app.debug {
+	if app.dryRun {
 		return `device_id: abcdefab-0123-01ab-23cd-0123abcd4567
 token: deadbeef-0000-cafe-babe-0000feedface
 account_id: abcdef12-3456-aaaa-bbbb-cccc12345678
@@ -226,7 +226,7 @@ func (app *Application) updateWarp(ctx context.Context, xray Xray) error {
 			"due to the misconfigured server config which should have " +
 			"inbounds[X].settings.clients[X].id value but apparently doesn't")
 	}
-	if !app.debug {
+	if !app.dryRun {
 		if err := utils.WriteStructToJSONFile(clientConfig, xray.Client.ConfigFilePath); err != nil {
 			return fmt.Errorf("error writing client config to %q: %w",
 				xray.Client.ConfigFilePath, err)
@@ -280,7 +280,7 @@ func (app *Application) updateWarp(ctx context.Context, xray Xray) error {
 			return fmt.Errorf("error updating the xray server config: %w", err)
 		}
 
-		if !app.debug {
+		if !app.dryRun {
 			app.logger.Info.Println("Writing the new xray server config to file...")
 			srvBackupFile, err := utils.BackupFile(xray.Server.ConfigFilePath)
 			if err != nil {

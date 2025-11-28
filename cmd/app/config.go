@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"flag"
 	"fmt"
 	"path/filepath"
 
@@ -54,7 +55,8 @@ type Messages struct {
 }
 
 type Config struct {
-	Debug    bool     `koanf:"debug"`
+	// DryRun comes from the command line flag
+	DryRun   bool
 	Workdir  string   `koanf:"workdir"`
 	Xray     Xray     `koanf:"xray"`
 	Repos    []Repo   `koanf:"repos"`
@@ -62,7 +64,7 @@ type Config struct {
 }
 
 var defaults = Config{
-	Debug:   false,
+	DryRun:  false,
 	Workdir: ".",
 	Xray: Xray{
 		Server: XrayServer{
@@ -134,6 +136,13 @@ func findFilenameInRepo(repos []Repo, repoName string) (string, error) {
 	return fileName, nil
 }
 
+func parseFlags(config *Config) {
+	flag.BoolVar(
+		&config.DryRun, "dry-run", false, "Simulate execution without making changes",
+	)
+	flag.Parse()
+}
+
 // Loads configuration
 func loadConfig() (*Config, error) {
 	var k = koanf.New(".")
@@ -149,6 +158,8 @@ func loadConfig() (*Config, error) {
 	cfg := &Config{}
 
 	k.Unmarshal("", cfg)
+
+	parseFlags(cfg)
 
 	var err error
 

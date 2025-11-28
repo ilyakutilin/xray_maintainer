@@ -17,31 +17,6 @@ func FileExists(path string) bool {
 	return !os.IsNotExist(err)
 }
 
-// EnsureDir checks if a directory exists at the specified path,
-// and creates it if it doesn't exist.
-// Returns error if creation fails or if path exists but is not a directory.
-func EnsureDir(dirPath string) error {
-	// Check if the path exists
-	info, err := os.Stat(dirPath)
-	if os.IsNotExist(err) {
-		// Directory doesn't exist, create it
-		err = os.MkdirAll(dirPath, 0755)
-		if err != nil {
-			return fmt.Errorf("failed to create directory: %v", err)
-		}
-		return nil
-	}
-	if err != nil {
-		// Some other error occurred (like permission issues)
-		return fmt.Errorf("error checking directory: %v", err)
-	}
-	if !info.IsDir() {
-		return fmt.Errorf("path exists but is not a directory: %s", dirPath)
-	}
-	// Directory already exists
-	return nil
-}
-
 // ExpandPath handles ~, relative paths, and normalizes them
 func ExpandPath(path string) (string, error) {
 	// Expand tilde (~) to the user's home directory
@@ -59,6 +34,55 @@ func ExpandPath(path string) (string, error) {
 	}
 
 	return filepath.Clean(absPath), nil
+}
+
+// CheckDirPermissions checks if the current user has read and write permissions
+// to the given path
+func CheckDirPermissions(path string, readOnly bool) error {
+	// Check if path exists and is a directory
+	fileInfo, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("path does not exist: %s", path)
+		}
+		return fmt.Errorf("cannot access path: %w", err)
+	}
+
+	// Verify it's actually a directory
+	if !fileInfo.IsDir() {
+		return fmt.Errorf("path is not a directory: %s", path)
+	}
+
+	// Check read permission by attempting to read directory contents
+	if _, err := os.ReadDir(path); err != nil {
+		return fmt.Errorf("no read permission for directory: %s", path)
+	}
+
+	if !readOnly {
+		// Check write permission by creating, writing to, and removing a temporary file
+		tempFile, err := os.CreateTemp(path, "perm_test_")
+		if err != nil {
+			return fmt.Errorf("no write permission for directory: %s", path)
+		}
+		defer os.Remove(tempFile.Name()) // Clean up in case of errors
+
+		// Test actual writing capability
+		testContent := []byte("test")
+		if _, err := tempFile.Write(testContent); err != nil {
+			return fmt.Errorf("no write permission for directory: %s", path)
+		}
+
+		if err := tempFile.Close(); err != nil {
+			return fmt.Errorf("cannot close test file: %w", err)
+		}
+
+		// Clean up the test file
+		if err := os.Remove(tempFile.Name()); err != nil {
+			return fmt.Errorf("cannot remove test file: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // MakeExecutable makes a file executable
